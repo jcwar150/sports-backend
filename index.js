@@ -1,28 +1,15 @@
-const axios = require("axios");
-
-const ONESIGNAL_APP_ID = "886fb758-5e13-44df-87d4-3f3590e11491";
-const ONESIGNAL_API_KEY = "os_v2_app_rbx3owc6cncn7b6uh42zbyiushmkrdf7vziusku5baptmqserw6e5oqutekc6y23wf4suwmjeo3im6npn7wyf23646t2szuaalvbgpy"; // la nueva que generaste
-
-async function testNotification() {
-  try {
-    const res = await axios.post("https://onesignal.com/api/v1/notifications", {
-      app_id: ONESIGNAL_APP_ID,
-      included_segments: ["All"],
-      contents: { en: "Prueba de notificación desde backend" }
-    }, {
-      headers: {
-        "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    console.log("✅ Notificación enviada:", res.data);
-  } catch (err) {
-    console.error("❌ Error:", err.response?.data || err.message);
+await axios.post("https://onesignal.com/api/v1/notifications", {
+  app_id: ONESIGNAL_APP_ID,
+  included_segments: ["All"],
+  headings: { en: "⚽ Gol en vivo!" },
+  contents: { en: `${home} vs ${away}: ${score}` }
+}, {
+  headers: {
+    "Authorization": `Basic ${os_v2_app_rbx3owc6cncn7b6uh42zbyiushx6e7xyddzutk4aadjbrpwcax7atzbi2odlv5jyrliu5nbqohwm6lj4bbramgct4bck6klklkxbxny}`, // aquí va la REST API Key
+    "Content-Type": "application/json"
   }
-}
+});
 
-testNotification();
 
 
 
