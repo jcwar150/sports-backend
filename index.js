@@ -1,14 +1,13 @@
 require('dotenv').config();
 const axios = require('axios');
 
-// Variables de entorno
-const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID; // UUID de tu app en OneSignal
-const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY; // REST API Key de OneSignal
-const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY || "04d73dd17729e5edb6408c2e826009ab";
+// Claves directas (no recomendado en producción)
+const ONESIGNAL_APP_ID = "886fb758-5e13-44df-87d4-3f3590e11491"; // tu App ID real
+const ONESIGNAL_API_KEY = "os_v2_app_rbx3owc6cncn7b6uh42zbyiuseszyllgidaewbuqyqwcylfwno6um5s5ir4mr6rd76mfouwl3rmyr7k4wpx3lyhzgxdiduchqcuzaey"; // tu nueva API Key
+const FOOTBALL_API_KEY = "04d73dd17729e5edb6408c2e826009ab"; // tu API Key de fútbol
 
-let lastNotified = {}; // objeto para guardar últimos marcadores por partido
+let lastNotified = {};
 
-// Función para consultar partidos en vivo
 async function checkLiveMatches() {
   try {
     const response = await axios.get("https://v3.football.api-sports.io/fixtures?live=all", {
@@ -30,14 +29,9 @@ async function checkLiveMatches() {
 
       console.log(`📊 ${home} vs ${away}: ${score}`);
 
-      // Evitar notificación repetida
-      const lastScore = lastNotified[matchId];
-      if (lastScore === score) {
-        continue; // mismo marcador, no enviar
-      }
+      if (lastNotified[matchId] === score) continue;
       lastNotified[matchId] = score;
 
-      // Enviar notificación con OneSignal
       await axios.post("https://onesignal.com/api/v1/notifications", {
         app_id: ONESIGNAL_APP_ID,
         included_segments: ["All"],
@@ -57,11 +51,9 @@ async function checkLiveMatches() {
   }
 }
 
-// Ejecutar cada minuto
 setInterval(checkLiveMatches, 60 * 1000);
-
-// También ejecutar inmediatamente al iniciar
 checkLiveMatches();
+;
 
 
 
