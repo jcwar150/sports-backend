@@ -1,10 +1,12 @@
 require('dotenv').config();
 const axios = require('axios');
 
-// Variables de entorno (asegúrate de tenerlas en tu .env)
-const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID; // tu App ID de OneSignal
-const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY; // tu REST API Key de OneSignal
-const FOOTBALL_API_KEY = "04d73dd17729e5edb6408c2e826009ab"; // tu API Key de fútbol
+// Variables de entorno
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID; // UUID de tu app en OneSignal
+const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY; // REST API Key de OneSignal
+const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY || "04d73dd17729e5edb6408c2e826009ab";
+
+let lastNotified = {}; // objeto para guardar últimos marcadores por partido
 
 // Función para consultar partidos en vivo
 async function checkLiveMatches() {
@@ -15,7 +17,7 @@ async function checkLiveMatches() {
 
     const matches = response.data.response;
 
-    if (matches.length === 0) {
+    if (!matches || matches.length === 0) {
       console.log("⚽ No hay partidos en vivo ahora mismo.");
       return;
     }
@@ -24,11 +26,19 @@ async function checkLiveMatches() {
       const home = match.teams.home.name;
       const away = match.teams.away.name;
       const score = `${match.goals.home} - ${match.goals.away}`;
+      const matchId = match.fixture.id;
 
       console.log(`📊 ${home} vs ${away}: ${score}`);
 
+      // Evitar notificación repetida
+      const lastScore = lastNotified[matchId];
+      if (lastScore === score) {
+        continue; // mismo marcador, no enviar
+      }
+      lastNotified[matchId] = score;
+
       // Enviar notificación con OneSignal
-      await axios.post("https://api.onesignal.com/notifications", {
+      await axios.post("https://onesignal.com/api/v1/notifications", {
         app_id: ONESIGNAL_APP_ID,
         included_segments: ["All"],
         headings: { en: "⚽ Gol en vivo!" },
