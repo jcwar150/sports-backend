@@ -1,14 +1,19 @@
-const axios = require("axios");
+require('dotenv').config();
+const axios = require('axios');
 
-const ONESIGNAL_APP_ID = "886fb758-5e13-44df-87d4-3f3590e11491"; // tu App ID
-const ONESIGNAL_API_KEY = "os_v2_app_rbx3owc6cncn7b6uh42zbyiusfkfffiogz2esn4vkct2dpsyyovmt7dzo4bqfxmwvgu5mz67bz6a7aymepxhzcaunfoqdvjl4aaeooy"; // tu API Key v2
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
+
+console.log("App ID:", ONESIGNAL_APP_ID);
+console.log("API Key:", ONESIGNAL_API_KEY ? ONESIGNAL_API_KEY.substring(0,25) + "..." : "MISSING");
 
 async function testNotification() {
   try {
     const res = await axios.post("https://onesignal.com/api/v1/notifications", {
       app_id: ONESIGNAL_APP_ID,
-      included_segments: ["All"],
-      contents: { en: "Prueba directa con API Key v2 ✅" }
+      included_segments: ["All"], // envía a todos los dispositivos registrados
+      headings: { en: "🔔 Test Notification" },
+      contents: { en: "Si ves esto, la integración funciona ✅" }
     }, {
       headers: {
         "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
