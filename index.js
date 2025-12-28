@@ -1,7 +1,7 @@
 const axios = require("axios");
 
 const ONESIGNAL_APP_ID = "886fb758-5e13-44df-87d4-3f3590e11491";
-const ONESIGNAL_API_KEY = "TU_REST_API_KEY_AQUI"; // la nueva que generaste
+const ONESIGNAL_API_KEY = "os_v2_app_rbx3owc6cncn7b6uh42zbyiushmkrdf7vziusku5baptmqserw6e5oqutekc6y23wf4suwmjeo3im6npn7wyf23646t2szuaalvbgpy"; // la nueva que generaste
 
 async function testNotification() {
   try {
