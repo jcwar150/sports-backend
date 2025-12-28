@@ -2,7 +2,7 @@ const axios = require("axios");
 
 // ⚠️ Pon aquí tus valores reales
 const ONESIGNAL_APP_ID = "886fb758-5e13-44df-87d4-3f3590e11491"; // tu App ID
-const ONESIGNAL_API_KEY = "x6e7xyddzutk4aadjbrpwcax7"; // tu REST API Key
+const ONESIGNAL_API_KEY = "os_v2_app_rbx3owc6cncn7b6uh42zbyiusfkfffiogz2esn4vkct2dpsyyovmt7dzo4bqfxmwvgu5mz67bz6a7aymepxhzcaunfoqdvjl4aaeooy"; // tu REST API Key
 
 async function testNotification() {
   try {
