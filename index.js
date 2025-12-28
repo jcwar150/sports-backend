@@ -1,14 +1,22 @@
-const axios = require("axios");
+require('dotenv').config();
+const axios = require('axios');
+
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
+
+// 🔎 Logs de verificación
+console.log("App ID:", ONESIGNAL_APP_ID);
+console.log("API Key (primeros 15 caracteres):", ONESIGNAL_API_KEY ? ONESIGNAL_API_KEY.substring(0, 15) + "..." : "MISSING");
 
 async function testNotification() {
   try {
     const res = await axios.post("https://onesignal.com/api/v1/notifications", {
-      app_id: "886fb758-5e13-44df-87d4-3f3590e11491",
+      app_id: ONESIGNAL_APP_ID,
       included_segments: ["All"],
-      contents: { en: "Prueba con nueva API Key ✅" }
+      contents: { en: "Prueba de notificación ✅" }
     }, {
       headers: {
-        "Authorization": `Basic ${process.env.ONESIGNAL_API_KEY}`,
+        "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
         "Content-Type": "application/json"
       }
     });
