@@ -5,7 +5,8 @@ const OneSignal = require("onesignal-node");
 // Variables de entorno
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
-const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY || "04d73dd17729e5edb6408c2e826009ab";
+const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY;
+const BASKETBALL_API_KEY = process.env.BASKETBALL_API_KEY;
 
 let lastNotified = {}; // objeto para guardar últimos marcadores por partido
 
@@ -29,8 +30,8 @@ async function sendNotification(message) {
 async function checkMatches() {
   try {
     // ⚽ API de fútbol
-    const footballRes = await axios.get("https://api-football-v1.p.rapidapi.com/v3/fixtures", {
-      headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY }
+    const footballRes = await axios.get("https://v3.football.api-sports.io/fixtures", {
+      headers: { "x-apisports-key": FOOTBALL_API_KEY }
     });
 
     footballRes.data.response.forEach(match => {
@@ -49,8 +50,8 @@ async function checkMatches() {
     });
 
     // 🏀 API de basket
-    const basketRes = await axios.get("https://api-basketball.p.rapidapi.com/games", {
-      headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } // usa tu API key de basket si es distinta
+    const basketRes = await axios.get("https://v1.basketball.api-sports.io/games", {
+      headers: { "x-apisports-key": BASKETBALL_API_KEY }
     });
 
     basketRes.data.response.forEach(game => {
@@ -72,6 +73,7 @@ async function checkMatches() {
 
 // Ejecutar cada cierto tiempo
 setInterval(checkMatches, 60 * 1000); // cada minuto
+
 
 
 
