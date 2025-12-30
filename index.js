@@ -1,67 +1,84 @@
-require('dotenv').config();
-const axios = require('axios');
+// index.js
+const axios = require("axios");
+const OneSignal = require("onesignal-node");
 
 // Variables de entorno
-const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID; // UUID de tu app en OneSignal
-const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY; // REST API Key de OneSignal
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY || "04d73dd17729e5edb6408c2e826009ab";
 
 let lastNotified = {}; // objeto para guardar últimos marcadores por partido
 
-// Función para consultar partidos en vivo
-async function checkLiveMatches() {
+// Inicializar cliente OneSignal
+const client = new OneSignal.Client(ONESIGNAL_APP_ID, ONESIGNAL_API_KEY);
+
+// Función para enviar notificación
+async function sendNotification(message) {
   try {
-    const response = await axios.get("https://v3.football.api-sports.io/fixtures?live=all", {
-      headers: { "x-apisports-key": FOOTBALL_API_KEY }
+    await client.createNotification({
+      contents: { en: message },
+      included_segments: ["All"]
     });
-
-    const matches = response.data.response;
-
-    if (!matches || matches.length === 0) {
-      console.log("⚽ No hay partidos en vivo ahora mismo.");
-      return;
-    }
-
-    for (const match of matches) {
-      const home = match.teams.home.name;
-      const away = match.teams.away.name;
-      const score = `${match.goals.home} - ${match.goals.away}`;
-      const matchId = match.fixture.id;
-
-      console.log(`📊 ${home} vs ${away}: ${score}`);
-
-      // Evitar notificación repetida
-      const lastScore = lastNotified[matchId];
-      if (lastScore === score) {
-        continue; // mismo marcador, no enviar
-      }
-      lastNotified[matchId] = score;
-
-      // Enviar notificación con OneSignal
-      await axios.post("https://onesignal.com/api/v1/notifications", {
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"],
-        headings: { en: "⚽ Gol en vivo!" },
-        contents: { en: `${home} vs ${away}: ${score}` }
-      }, {
-        headers: {
-          "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      });
-
-      console.log("✅ Notificación enviada a OneSignal");
-    }
+    console.log("✅ Notificación enviada:", message);
   } catch (err) {
-    console.error("❌ Error:", err.response?.data || err.message);
+    console.error("Error enviando notificación:", err.message);
   }
 }
 
-// Ejecutar cada minuto
-setInterval(checkLiveMatches, 60 * 1000);
+// Función para chequear partidos
+async function checkMatches() {
+  try {
+    // ⚽ API de fútbol
+    const footballRes = await axios.get("https://api-football-v1.p.rapidapi.com/v3/fixtures", {
+      headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY }
+    });
 
-// También ejecutar inmediatamente al iniciar
-checkLiveMatches();
+    footballRes.data.response.forEach(match => {
+      const goalsHome = match.goals.home || 0;
+      const goalsAway = match.goals.away || 0;
+      const totalGoals = goalsHome + goalsAway;
+      const matchId = match.fixture.id;
+      const score = `${goalsHome}-${goalsAway}`;
+
+      if (totalGoals > 2) {
+        if (lastNotified[matchId] !== score) {
+          sendNotification(`⚽ Partido con más de 2 goles: ${match.teams.home.name} vs ${match.teams.away.name} (${score})`);
+          lastNotified[matchId] = score;
+        }
+      }
+    });
+
+    // 🏀 API de basket
+    const basketRes = await axios.get("https://api-basketball.p.rapidapi.com/games", {
+      headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } // usa tu API key de basket si es distinta
+    });
+
+    basketRes.data.response.forEach(game => {
+      const quarter = game.periods.current; // depende de la API, puede ser número o string
+      const gameId = game.id;
+
+      if (quarter >= 2) { // del medio tiempo en adelante
+        if (!lastNotified[gameId]) {
+          sendNotification(`🏀 Partido en progreso (desde halftime): ${game.teams.home.name} vs ${game.teams.away.name}, periodo ${quarter}`);
+          lastNotified[gameId] = true;
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error("Error consultando APIs:", err.message);
+  }
+}
+
+// Ejecutar cada cierto tiempo
+setInterval(checkMatches, 60 * 1000); // cada minuto
+
+
+
+  
+
+
+
 
 
 

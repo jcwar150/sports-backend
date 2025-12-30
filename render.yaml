@@ -8,8 +8,8 @@ services:
     autoDeploy: true
     envVars:
       - key: ONESIGNAL_APP_ID
-        value: "tu-app-id-de-onesignal"
+        value: "886fb758-5e13-44df-87d4-3f3590e11491"
       - key: ONESIGNAL_API_KEY
-        value: "tu-api-key-de-onesignal"
+        value: "os_v2_app_rbx3owc6cncn7b6uh42zbyiusfkfffiogz2esn4vkct2dpsyyovmt7dzo4bqfxmwvgu5mz67bz6a7aymepxhzcaunfoqdvjl4aaeooy"
       - key: FOOTBALL_API_KEY
         value: "04d73dd17729e5edb6408c2e826009ab"
