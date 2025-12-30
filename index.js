@@ -1,14 +1,13 @@
-// index.js
 const https = require("https");
 
-// Tu API key desde variables de entorno en Render
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+// Usa la variable FOOTBALL_API_KEY que ya configuraste en Render
+const RAPIDAPI_KEY = process.env.FOOTBALL_API_KEY;
 
 async function getLiveFootball() {
   const options = {
     method: "GET",
     hostname: "sportscore1.p.rapidapi.com",
-    path: "/sports/1/events/live", // ⚽ Fútbol en vivo
+    path: "/sports/1/events/live",
     headers: {
       "x-rapidapi-key": RAPIDAPI_KEY,
       "x-rapidapi-host": "sportscore1.p.rapidapi.com"
@@ -17,11 +16,7 @@ async function getLiveFootball() {
 
   const req = https.request(options, res => {
     let data = "";
-
-    res.on("data", chunk => {
-      data += chunk;
-    });
-
+    res.on("data", chunk => (data += chunk));
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
@@ -32,15 +27,12 @@ async function getLiveFootball() {
     });
   });
 
-  req.on("error", err => {
-    console.error("❌ Error en la petición:", err.message);
-  });
-
+  req.on("error", err => console.error("❌ Error en la petición:", err.message));
   req.end();
 }
 
-// Ejecutar prueba
 getLiveFootball();
+
 
 
 
