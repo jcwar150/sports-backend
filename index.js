@@ -1,15 +1,13 @@
 const https = require("https");
 const axios = require("axios");
 
-// Variables de entorno en Render
 const RAPIDAPI_KEY = process.env.FOOTBALL_API_KEY;   // SportScore API Key
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
-// Cache para guardar último estado de cada partido
-const lastEvents = new Map();
+// Cache para evitar notificaciones duplicadas
+const notifiedEvents = new Map();
 
-// Función para enviar notificación con OneSignal
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -32,12 +30,11 @@ async function sendNotification(message) {
   }
 }
 
-// Función para obtener partidos en vivo y filtrar corners/rojas
-function getLiveFootball() {
+function getLiveEvents(sportId) {
   const options = {
     method: "GET",
     hostname: "sportscore1.p.rapidapi.com",
-    path: "/sports/1/events/live",
+    path: `/sports/${sportId}/events/live`,
     headers: {
       "x-rapidapi-key": RAPIDAPI_KEY,
       "x-rapidapi-host": "sportscore1.p.rapidapi.com"
@@ -52,10 +49,11 @@ function getLiveFootball() {
         const json = JSON.parse(data);
 
         json.data.forEach(event => {
-          const home = event.home_team.name;
-          const away = event.away_team.name;
-          const score = `${event.home_score.current} - ${event.away_score.current}`;
+          const home = event.home_team?.name || "Home";
+          const away = event.away_team?.name || "Away";
+          const score = `${event.home_score?.current || 0} - ${event.away_score?.current || 0}`;
           const status = event.status_more;
+          const eventKey = `${sportId}-${event.id}`;
 
           // Contadores
           let corners = 0;
@@ -68,19 +66,31 @@ function getLiveFootball() {
             });
           }
 
-          // Construir mensaje
-          const message = `⚽ ${home} vs ${away} | Marcador: ${score} | Estado: ${status} | 🟦 Corners: ${corners} | 🔴 Rojas: ${redCards}`;
+          // 1. Tarjeta roja en primer tiempo (solo fútbol)
+          if (sportId === 1 && status.includes("1st half") && redCards > 0) {
+            const key = `${eventKey}-redcard1st`;
+            if (!notifiedEvents.has(key)) {
+              sendNotification(`🔴 Tarjeta roja en 1er tiempo: ${home} vs ${away} | Marcador: ${score}`);
+              notifiedEvents.set(key, true);
+            }
+          }
 
-          // Verificar si ya enviamos este mismo estado
-          const lastKey = `${event.id}`;
-          const lastData = `${score}-${corners}-${redCards}-${status}`;
+          // 2. Corners ≤ 2 al terminar primer tiempo (solo fútbol)
+          if (sportId === 1 && status.includes("Halftime") && corners <= 2) {
+            const key = `${eventKey}-cornersHT`;
+            if (!notifiedEvents.has(key)) {
+              sendNotification(`🟦 Solo ${corners} corners en 1er tiempo: ${home} vs ${away}`);
+              notifiedEvents.set(key, true);
+            }
+          }
 
-          if (lastEvents.get(lastKey) !== lastData) {
-            // Nuevo estado → enviar notificación
-            sendNotification(message);
-            lastEvents.set(lastKey, lastData);
-          } else {
-            console.log(`⏩ Sin cambios en ${home} vs ${away}, no se envía notificación`);
+          // 3. Prórroga en fútbol o básquet
+          if (status.toLowerCase().includes("extra time") || status.toLowerCase().includes("overtime")) {
+            const key = `${eventKey}-overtime`;
+            if (!notifiedEvents.has(key)) {
+              sendNotification(`⏱️ Prórroga en ${home} vs ${away} | Marcador: ${score}`);
+              notifiedEvents.set(key, true);
+            }
           }
         });
       } catch (err) {
@@ -93,8 +103,12 @@ function getLiveFootball() {
   req.end();
 }
 
-// Ejecutar cada 2 minutos
-setInterval(getLiveFootball, 2 * 60 * 1000);
+// Ejecutar cada 5 minutos para fútbol (1) y básquet (2)
+setInterval(() => {
+  getLiveEvents(1); // ⚽ Fútbol
+  getLiveEvents(2); // 🏀 Básquet
+}, 5 * 60 * 1000);
+
 
 
 
