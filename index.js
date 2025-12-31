@@ -15,7 +15,7 @@ app.listen(PORT, () => {
 });
 
 // --- Función para obtener estadísticas de un partido ---
-function getEventStatistics(eventId, home, away) {
+function getEventStatistics(eventId, home, away, status) {
   const options = {
     method: "GET",
     hostname: "sportscore1.p.rapidapi.com",
@@ -32,16 +32,30 @@ function getEventStatistics(eventId, home, away) {
     res.on("end", () => {
       try {
         const stats = JSON.parse(data).data || [];
-        stats.forEach(stat => {
-          if (
-            stat.period === "all" &&
-            ["corner_kicks", "yellow_cards", "red_cards"].includes(stat.name)
-          ) {
-            console.log(
-              `📊 ${home} vs ${away} | ${stat.name}: Home ${stat.home} - Away ${stat.away}`
-            );
+
+        // Buscar corner_kicks y red_cards
+        const corners = stats.find(s => s.period === "all" && s.name === "corner_kicks");
+        const redCards = stats.find(s => s.period === "all" && s.name === "red_cards");
+
+        if (!corners) {
+          console.log(`⏭️ ${home} vs ${away} | No hay datos de córneres`);
+          return;
+        }
+
+        const totalCorners = parseInt(corners.home) + parseInt(corners.away);
+
+        // Solo mostrar si es medio tiempo o prórroga
+        if (status.includes("halftime") || status.includes("extra_time")) {
+          if (totalCorners <= 2) {
+            console.log(`⚠️ ${home} vs ${away} | Total córneres: ${totalCorners} (<=2)`);
+          } else {
+            console.log(`📊 ${home} vs ${away} | Total córneres: ${totalCorners}`);
           }
-        });
+        }
+
+        if (redCards) {
+          console.log(`🟥 ${home} vs ${away} | Red Cards: Home ${redCards.home} - Away ${redCards.away}`);
+        }
       } catch (err) {
         console.error("❌ Error parseando statistics:", err.message);
       }
@@ -75,8 +89,10 @@ function getLiveEvents(sportId) {
         json.data.forEach(event => {
           const home = event.home_team?.name || "Home";
           const away = event.away_team?.name || "Away";
-          console.log(`🔎 Revisando partido: ${home} vs ${away}`);
-          getEventStatistics(event.id, home, away);
+          const status = event.status_more || "";
+
+          console.log(`🔎 Revisando partido: ${home} vs ${away} | Estado: ${status}`);
+          getEventStatistics(event.id, home, away, status);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta live:", err.message);
@@ -95,6 +111,7 @@ setInterval(() => {
   console.log("🔄 Buscando partidos en vivo...");
   getLiveEvents(1); // ⚽ Fútbol
 }, 5 * 60 * 1000);
+
 
 
 
