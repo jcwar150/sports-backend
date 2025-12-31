@@ -1,5 +1,6 @@
 const https = require("https");
 const axios = require("axios");
+const express = require("express");
 
 const RAPIDAPI_KEY = process.env.FOOTBALL_API_KEY;   // SportScore API Key
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
@@ -8,6 +9,19 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 // Cache para evitar notificaciones duplicadas
 const notifiedEvents = new Map();
 
+// --- Servidor Express mínimo ---
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.send("⚽ Worker de notificaciones corriendo en Render");
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor escuchando en puerto ${PORT}`);
+});
+
+// --- Función para enviar notificación ---
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -30,6 +44,7 @@ async function sendNotification(message) {
   }
 }
 
+// --- Función para obtener partidos en vivo ---
 function getLiveEvents(sportId) {
   const options = {
     method: "GET",
@@ -66,7 +81,7 @@ function getLiveEvents(sportId) {
             });
           }
 
-          // 1. Tarjeta roja en primer tiempo (solo fútbol)
+          // 1. Tarjeta roja en primer tiempo (fútbol)
           if (sportId === 1 && status.toLowerCase().includes("1st half") && redCards > 0) {
             const key = `${eventKey}-redcard1st`;
             if (!notifiedEvents.has(key)) {
@@ -75,7 +90,7 @@ function getLiveEvents(sportId) {
             }
           }
 
-          // 2. Corners ≤ 2 al terminar primer tiempo (solo fútbol)
+          // 2. Corners ≤ 2 al terminar primer tiempo (fútbol)
           if (sportId === 1 && status.toLowerCase().includes("halftime") && corners <= 2) {
             const key = `${eventKey}-cornersHT`;
             if (!notifiedEvents.has(key)) {
@@ -103,15 +118,13 @@ function getLiveEvents(sportId) {
   req.end();
 }
 
-// Worker loop: cada 5 minutos
+// --- Loop cada 5 minutos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos en vivo...");
   getLiveEvents(1); // ⚽ Fútbol
   getLiveEvents(2); // 🏀 Básquet
 }, 5 * 60 * 1000);
 
-// Importante: NO abrimos ningún puerto → esto corre como Background Worker en Render
-;
 
 
 
