@@ -44,6 +44,72 @@ async function sendNotification(message) {
   }
 }
 
+// --- Función para obtener detalle de un evento ---
+function getEventDetails(eventId, sportId, home, away, score, status, eventKey) {
+  const options = {
+    method: "GET",
+    hostname: "sportscore1.p.rapidapi.com",
+    path: `/events/${eventId}`,
+    headers: {
+      "x-rapidapi-key": RAPIDAPI_KEY,
+      "x-rapidapi-host": "sportscore1.p.rapidapi.com"
+    }
+  };
+
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const event = JSON.parse(data).data;
+
+        // Estadísticas oficiales
+        const cornersStat = event.statistics?.corner || event.statistics?.corners || 0;
+
+        // Incidents para tarjetas rojas
+        let redCards = 0;
+        if (event.incidents) {
+          event.incidents.forEach(incident => {
+            if (incident.incident_type === "red_card") redCards++;
+          });
+        }
+
+        // 1. Tarjeta roja en primer tiempo (fútbol)
+        if (sportId === 1 && status.toLowerCase().includes("1st half") && redCards > 0) {
+          const key = `${eventKey}-redcard1st`;
+          if (!notifiedEvents.has(key)) {
+            sendNotification(`🔴 Tarjeta roja en 1er tiempo: ${home} vs ${away} | Marcador: ${score}`);
+            notifiedEvents.set(key, true);
+          }
+        }
+
+        // 2. Corners ≤ 2 al terminar primer tiempo (fútbol)
+        if (sportId === 1 && status.toLowerCase().includes("halftime") && cornersStat <= 2) {
+          const key = `${eventKey}-cornersHT`;
+          if (!notifiedEvents.has(key)) {
+            sendNotification(`🟦 Solo ${cornersStat} corners en 1er tiempo: ${home} vs ${away}`);
+            notifiedEvents.set(key, true);
+          }
+        }
+
+        // 3. Prórroga en fútbol o básquet
+        if (status.toLowerCase().includes("extra time") || status.toLowerCase().includes("overtime")) {
+          const key = `${eventKey}-overtime`;
+          if (!notifiedEvents.has(key)) {
+            sendNotification(`⏱️ Prórroga en ${home} vs ${away} | Marcador: ${score}`);
+            notifiedEvents.set(key, true);
+          }
+        }
+      } catch (err) {
+        console.error("❌ Error parseando detalle:", err.message);
+      }
+    });
+  });
+
+  req.on("error", err => console.error("❌ Error en detalle:", err.message));
+  req.end();
+}
+
 // --- Función para obtener partidos en vivo ---
 function getLiveEvents(sportId) {
   const options = {
@@ -70,43 +136,8 @@ function getLiveEvents(sportId) {
           const status = event.status_more || "";
           const eventKey = `${sportId}-${event.id}`;
 
-          // --- Estadísticas oficiales ---
-          const cornersStat = event.statistics?.corner || event.statistics?.corners || 0;
-
-          // --- Incidents para tarjetas rojas ---
-          let redCards = 0;
-          if (event.incidents) {
-            event.incidents.forEach(incident => {
-              if (incident.incident_type === "red_card") redCards++;
-            });
-          }
-
-          // 1. Tarjeta roja en primer tiempo (fútbol)
-          if (sportId === 1 && status.toLowerCase().includes("1st half") && redCards > 0) {
-            const key = `${eventKey}-redcard1st`;
-            if (!notifiedEvents.has(key)) {
-              sendNotification(`🔴 Tarjeta roja en 1er tiempo: ${home} vs ${away} | Marcador: ${score}`);
-              notifiedEvents.set(key, true);
-            }
-          }
-
-          // 2. Corners ≤ 2 al terminar primer tiempo (fútbol)
-          if (sportId === 1 && status.toLowerCase().includes("halftime") && cornersStat <= 2) {
-            const key = `${eventKey}-cornersHT`;
-            if (!notifiedEvents.has(key)) {
-              sendNotification(`🟦 Solo ${cornersStat} corners en 1er tiempo: ${home} vs ${away}`);
-              notifiedEvents.set(key, true);
-            }
-          }
-
-          // 3. Prórroga en fútbol o básquet
-          if (status.toLowerCase().includes("extra time") || status.toLowerCase().includes("overtime")) {
-            const key = `${eventKey}-overtime`;
-            if (!notifiedEvents.has(key)) {
-              sendNotification(`⏱️ Prórroga en ${home} vs ${away} | Marcador: ${score}`);
-              notifiedEvents.set(key, true);
-            }
-          }
+          // Llamada al detalle del evento para estadísticas completas
+          getEventDetails(event.id, sportId, home, away, score, status, eventKey);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta:", err.message);
@@ -124,6 +155,7 @@ setInterval(() => {
   getLiveEvents(1); // ⚽ Fútbol
   getLiveEvents(2); // 🏀 Básquet
 }, 5 * 60 * 1000);
+
 
 
 
