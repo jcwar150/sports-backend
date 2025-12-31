@@ -52,7 +52,7 @@ function getLiveEvents(sportId) {
           const home = event.home_team?.name || "Home";
           const away = event.away_team?.name || "Away";
           const score = `${event.home_score?.current || 0} - ${event.away_score?.current || 0}`;
-          const status = event.status_more;
+          const status = event.status_more || "";
           const eventKey = `${sportId}-${event.id}`;
 
           // Contadores
@@ -67,7 +67,7 @@ function getLiveEvents(sportId) {
           }
 
           // 1. Tarjeta roja en primer tiempo (solo fútbol)
-          if (sportId === 1 && status.includes("1st half") && redCards > 0) {
+          if (sportId === 1 && status.toLowerCase().includes("1st half") && redCards > 0) {
             const key = `${eventKey}-redcard1st`;
             if (!notifiedEvents.has(key)) {
               sendNotification(`🔴 Tarjeta roja en 1er tiempo: ${home} vs ${away} | Marcador: ${score}`);
@@ -76,7 +76,7 @@ function getLiveEvents(sportId) {
           }
 
           // 2. Corners ≤ 2 al terminar primer tiempo (solo fútbol)
-          if (sportId === 1 && status.includes("Halftime") && corners <= 2) {
+          if (sportId === 1 && status.toLowerCase().includes("halftime") && corners <= 2) {
             const key = `${eventKey}-cornersHT`;
             if (!notifiedEvents.has(key)) {
               sendNotification(`🟦 Solo ${corners} corners en 1er tiempo: ${home} vs ${away}`);
@@ -103,11 +103,15 @@ function getLiveEvents(sportId) {
   req.end();
 }
 
-// Ejecutar cada 5 minutos para fútbol (1) y básquet (2)
+// Worker loop: cada 5 minutos
 setInterval(() => {
+  console.log("🔄 Buscando partidos en vivo...");
   getLiveEvents(1); // ⚽ Fútbol
   getLiveEvents(2); // 🏀 Básquet
 }, 5 * 60 * 1000);
+
+// Importante: NO abrimos ningún puerto → esto corre como Background Worker en Render
+;
 
 
 
