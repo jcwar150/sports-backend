@@ -18,7 +18,7 @@ app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
 
-// --- Función para enviar notificación (no la usamos aún en esta prueba) ---
+// --- Función para enviar notificación (la dejamos lista por si quieres usarla) ---
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -39,6 +39,50 @@ async function sendNotification(message) {
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
+}
+
+// --- Función para obtener incidents de un partido ---
+function getEventIncidents(eventId, home, away, score, status) {
+  const options = {
+    method: "GET",
+    hostname: "sportscore1.p.rapidapi.com",
+    path: `/events/${eventId}/incidents`,
+    headers: {
+      "x-rapidapi-key": RAPIDAPI_KEY,
+      "x-rapidapi-host": "sportscore1.p.rapidapi.com"
+    }
+  };
+
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const incidents = JSON.parse(data).data || [];
+
+        // Contar córneres
+        const corners = incidents.filter(
+          inc => inc.incident_type && inc.incident_type.toLowerCase().includes("corner")
+        ).length;
+
+        // Contar tarjetas rojas
+        const redCards = incidents.filter(
+          inc => inc.incident_type && inc.incident_type.toLowerCase().includes("red_card")
+        ).length;
+
+        // Mostrar en logs
+        console.log("📊 Partido:", home, "vs", away, "| Estado:", status, "| Marcador:", score);
+        console.log("   ➡️ Córneres detectados:", corners);
+        console.log("   ➡️ Tarjetas rojas detectadas:", redCards);
+
+      } catch (err) {
+        console.error("❌ Error parseando incidents:", err.message);
+      }
+    });
+  });
+
+  req.on("error", err => console.error("❌ Error en la petición incidents:", err.message));
+  req.end();
 }
 
 // --- Función para obtener partidos en vivo ---
@@ -66,34 +110,16 @@ function getLiveEvents(sportId) {
           const score = `${event.home_score?.current || 0} - ${event.away_score?.current || 0}`;
           const status = event.status_more || "";
 
-          // Estadísticas oficiales (si existen)
-          const cornersStat = event.statistics?.corner || event.statistics?.corners || 0;
-
-          // Conteo manual de incidents como respaldo
-          let cornersCount = 0;
-          if (event.incidents) {
-            event.incidents.forEach(incident => {
-              if (
-                incident.incident_type &&
-                incident.incident_type.toLowerCase().includes("corner")
-              ) {
-                cornersCount++;
-              }
-            });
-          }
-
-          // Mostrar en logs
-          console.log("📊 Partido:", home, "vs", away, "| Estado:", status, "| Marcador:", score);
-          console.log("   ➡️ Estadísticas oficiales:", cornersStat, "corners");
-          console.log("   ➡️ Conteo por incidents:", cornersCount, "corners");
+          // Llamada al endpoint de incidents para este partido
+          getEventIncidents(event.id, home, away, score, status);
         });
       } catch (err) {
-        console.error("❌ Error parseando respuesta:", err.message);
+        console.error("❌ Error parseando respuesta live:", err.message);
       }
     });
   });
 
-  req.on("error", err => console.error("❌ Error en la petición:", err.message));
+  req.on("error", err => console.error("❌ Error en la petición live:", err.message));
   req.end();
 }
 
