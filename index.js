@@ -70,13 +70,13 @@ function getLiveEvents(sportId) {
           const status = event.status_more || "";
           const eventKey = `${sportId}-${event.id}`;
 
-          // Contadores
-          let corners = 0;
-          let redCards = 0;
+          // --- Estadísticas oficiales ---
+          const cornersStat = event.statistics?.corner || event.statistics?.corners || 0;
 
+          // --- Incidents para tarjetas rojas ---
+          let redCards = 0;
           if (event.incidents) {
             event.incidents.forEach(incident => {
-              if (incident.incident_type === "corner") corners++;
               if (incident.incident_type === "red_card") redCards++;
             });
           }
@@ -91,10 +91,10 @@ function getLiveEvents(sportId) {
           }
 
           // 2. Corners ≤ 2 al terminar primer tiempo (fútbol)
-          if (sportId === 1 && status.toLowerCase().includes("halftime") && corners <= 2) {
+          if (sportId === 1 && status.toLowerCase().includes("halftime") && cornersStat <= 2) {
             const key = `${eventKey}-cornersHT`;
             if (!notifiedEvents.has(key)) {
-              sendNotification(`🟦 Solo ${corners} corners en 1er tiempo: ${home} vs ${away}`);
+              sendNotification(`🟦 Solo ${cornersStat} corners en 1er tiempo: ${home} vs ${away}`);
               notifiedEvents.set(key, true);
             }
           }
@@ -124,6 +124,7 @@ setInterval(() => {
   getLiveEvents(1); // ⚽ Fútbol
   getLiveEvents(2); // 🏀 Básquet
 }, 5 * 60 * 1000);
+
 
 
 
