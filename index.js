@@ -1,48 +1,4 @@
-const https = require("https");
-const axios = require("axios");
-const express = require("express");
-
-const RAPIDAPI_KEY = process.env.FOOTBALL_API_KEY;   // SportScore API Key
-const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
-const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
-
-// --- Servidor Express mínimo ---
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => {
-  res.send("⚽ Worker de notificaciones corriendo en Render");
-});
-
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en puerto ${PORT}`);
-});
-
-// --- Función para enviar notificación (lista para usar si quieres) ---
-async function sendNotification(message) {
-  try {
-    await axios.post(
-      "https://api.onesignal.com/notifications",
-      {
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"],
-        contents: { en: message }
-      },
-      {
-        headers: {
-          "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    console.log("✅ Notificación enviada:", message);
-  } catch (err) {
-    console.error("❌ Error enviando notificación:", err.response?.data || err.message);
-  }
-}
-
-// --- Función para obtener estadísticas de un partido ---
-function getEventStatistics(eventId, home, away, score, status) {
+function getEventStatistics(eventId, home, away) {
   const options = {
     method: "GET",
     hostname: "sportscore1.p.rapidapi.com",
@@ -59,14 +15,7 @@ function getEventStatistics(eventId, home, away, score, status) {
     res.on("end", () => {
       try {
         const stats = JSON.parse(data).data || {};
-
-        const cornersStat = stats.corners || 0;
-        const redCardsStat = stats.red_cards || 0;
-
-        console.log("📊 Partido:", home, "vs", away, "| Estado:", status, "| Marcador:", score);
-        console.log("   ➡️ Córneres (statistics):", cornersStat);
-        console.log("   ➡️ Tarjetas rojas (statistics):", redCardsStat);
-
+        console.log("📋 Statistics crudo para", home, "vs", away, ":", JSON.stringify(stats, null, 2));
       } catch (err) {
         console.error("❌ Error parseando statistics:", err.message);
       }
@@ -77,7 +26,6 @@ function getEventStatistics(eventId, home, away, score, status) {
   req.end();
 }
 
-// --- Función para obtener partidos en vivo ---
 function getLiveEvents(sportId) {
   const options = {
     method: "GET",
@@ -102,8 +50,20 @@ function getLiveEvents(sportId) {
           const score = `${event.home_score?.current || 0} - ${event.away_score?.current || 0}`;
           const status = event.status_more || "";
 
+          console.log("📊 Partido:", home, "vs", away, "| Estado:", status, "| Marcador:", score);
+
+          // Mostrar todo el objeto statistics si existe
+          console.log("📋 Statistics crudo (live):", JSON.stringify(event.statistics, null, 2));
+
+          // Mostrar incidents crudos si existen
+          if (event.incidents) {
+            console.log("📋 Incidents crudos (live):", JSON.stringify(event.incidents, null, 2));
+          } else {
+            console.log("📋 No hay incidents en este snapshot.");
+          }
+
           // Llamada al endpoint de statistics para este partido
-          getEventStatistics(event.id, home, away, score, status);
+          getEventStatistics(event.id, home, away);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta live:", err.message);
