@@ -88,7 +88,7 @@ function getLiveEvents(sportId) {
 setInterval(() => {
   console.log("🔄 Buscando partidos en vivo...");
   getLiveEvents(1); // ⚽ Fútbol
-  getLiveEvents(2); // 🏀 Básquet
+  getLiveEvents(3); // 🏀 Básquet
 }, 5 * 60 * 1000);
 
 
