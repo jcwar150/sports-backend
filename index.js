@@ -1,77 +1,134 @@
-// index.js
+const https = require("https");
 const axios = require("axios");
-const OneSignal = require("onesignal-node");
+const express = require("express");
 
-// Variables de entorno
+const RAPIDAPI_KEY = process.env.FOOTBALL_API_KEY;   // SportScore API Key
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
-const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY || "04d73dd17729e5edb6408c2e826009ab";
 
-let lastNotified = {}; // objeto para guardar últimos marcadores por partido
+// Cache para evitar notificaciones duplicadas
+const notifiedEvents = new Map();
 
-// Inicializar cliente OneSignal
-const client = new OneSignal.Client(ONESIGNAL_APP_ID, ONESIGNAL_API_KEY);
+// --- Servidor Express mínimo ---
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Función para enviar notificación
+app.get("/", (req, res) => {
+  res.send("⚽ Worker de notificaciones corriendo en Render");
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor escuchando en puerto ${PORT}`);
+});
+
+// --- Función para enviar notificación ---
 async function sendNotification(message) {
   try {
-    await client.createNotification({
-      contents: { en: message },
-      included_segments: ["All"]
-    });
+    await axios.post(
+      "https://api.onesignal.com/notifications",
+      {
+        app_id: ONESIGNAL_APP_ID,
+        included_segments: ["All"],
+        contents: { en: message }
+      },
+      {
+        headers: {
+          "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
     console.log("✅ Notificación enviada:", message);
   } catch (err) {
-    console.error("Error enviando notificación:", err.message);
+    console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
 
-// Función para chequear partidos
-async function checkMatches() {
-  try {
-    // ⚽ API de fútbol
-    const footballRes = await axios.get("https://api-football-v1.p.rapidapi.com/v3/fixtures", {
-      headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY }
-    });
+// --- Función para obtener partidos en vivo ---
+function getLiveEvents(sportId) {
+  const options = {
+    method: "GET",
+    hostname: "sportscore1.p.rapidapi.com",
+    path: `/sports/${sportId}/events/live`,
+    headers: {
+      "x-rapidapi-key": RAPIDAPI_KEY,
+      "x-rapidapi-host": "sportscore1.p.rapidapi.com"
+    }
+  };
 
-    footballRes.data.response.forEach(match => {
-      const goalsHome = match.goals.home || 0;
-      const goalsAway = match.goals.away || 0;
-      const totalGoals = goalsHome + goalsAway;
-      const matchId = match.fixture.id;
-      const score = `${goalsHome}-${goalsAway}`;
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const json = JSON.parse(data);
 
-      if (totalGoals > 2) {
-        if (lastNotified[matchId] !== score) {
-          sendNotification(`⚽ Partido con más de 2 goles: ${match.teams.home.name} vs ${match.teams.away.name} (${score})`);
-          lastNotified[matchId] = score;
-        }
+        json.data.forEach(event => {
+          const home = event.home_team?.name || "Home";
+          const away = event.away_team?.name || "Away";
+          const score = `${event.home_score?.current || 0} - ${event.away_score?.current || 0}`;
+          const status = event.status_more || "";
+          const eventKey = `${sportId}-${event.id}`;
+
+          // Contadores
+          let corners = 0;
+          let redCards = 0;
+
+          if (event.incidents) {
+            event.incidents.forEach(incident => {
+              if (incident.incident_type === "corner") corners++;
+              if (incident.incident_type === "red_card") redCards++;
+            });
+          }
+
+          // 1. Tarjeta roja en primer tiempo (fútbol)
+          if (sportId === 1 && status.toLowerCase().includes("1st half") && redCards > 0) {
+            const key = `${eventKey}-redcard1st`;
+            if (!notifiedEvents.has(key)) {
+              sendNotification(`🔴 Tarjeta roja en 1er tiempo: ${home} vs ${away} | Marcador: ${score}`);
+              notifiedEvents.set(key, true);
+            }
+          }
+
+          // 2. Corners ≤ 2 al terminar primer tiempo (fútbol)
+          if (sportId === 1 && status.toLowerCase().includes("halftime") && corners <= 2) {
+            const key = `${eventKey}-cornersHT`;
+            if (!notifiedEvents.has(key)) {
+              sendNotification(`🟦 Solo ${corners} corners en 1er tiempo: ${home} vs ${away}`);
+              notifiedEvents.set(key, true);
+            }
+          }
+
+          // 3. Prórroga en fútbol o básquet
+          if (status.toLowerCase().includes("extra time") || status.toLowerCase().includes("overtime")) {
+            const key = `${eventKey}-overtime`;
+            if (!notifiedEvents.has(key)) {
+              sendNotification(`⏱️ Prórroga en ${home} vs ${away} | Marcador: ${score}`);
+              notifiedEvents.set(key, true);
+            }
+          }
+        });
+      } catch (err) {
+        console.error("❌ Error parseando respuesta:", err.message);
       }
     });
+  });
 
-    // 🏀 API de basket
-    const basketRes = await axios.get("https://api-basketball.p.rapidapi.com/games", {
-      headers: { "X-RapidAPI-Key": FOOTBALL_API_KEY } // usa tu API key de basket si es distinta
-    });
-
-    basketRes.data.response.forEach(game => {
-      const quarter = game.periods.current; // depende de la API, puede ser número o string
-      const gameId = game.id;
-
-      if (quarter >= 2) { // del medio tiempo en adelante
-        if (!lastNotified[gameId]) {
-          sendNotification(`🏀 Partido en progreso (desde halftime): ${game.teams.home.name} vs ${game.teams.away.name}, periodo ${quarter}`);
-          lastNotified[gameId] = true;
-        }
-      }
-    });
-
-  } catch (err) {
-    console.error("Error consultando APIs:", err.message);
-  }
+  req.on("error", err => console.error("❌ Error en la petición:", err.message));
+  req.end();
 }
 
-// Ejecutar cada cierto tiempo
-setInterval(checkMatches, 60 * 1000); // cada minuto
+// --- Loop cada 5 minutos ---
+setInterval(() => {
+  console.log("🔄 Buscando partidos en vivo...");
+  getLiveEvents(1); // ⚽ Fútbol
+  getLiveEvents(2); // 🏀 Básquet
+}, 5 * 60 * 1000);
+
+
+
+
+
 
 
 
