@@ -1,10 +1,54 @@
+const https = require("https");
+const axios = require("axios");
+const express = require("express");
+
+const FOOTBALL_API_KEY = process.env.FOOTBALL_API_KEY;   // SportScore API Key
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
+
+// --- Servidor Express mínimo ---
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.send("⚽ Worker de notificaciones corriendo en Render");
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor escuchando en puerto ${PORT}`);
+});
+
+// --- Función para enviar notificación (lista para usar si quieres) ---
+async function sendNotification(message) {
+  try {
+    await axios.post(
+      "https://api.onesignal.com/notifications",
+      {
+        app_id: ONESIGNAL_APP_ID,
+        included_segments: ["All"],
+        contents: { en: message }
+      },
+      {
+        headers: {
+          "Authorization": `Basic ${ONESIGNAL_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    console.log("✅ Notificación enviada:", message);
+  } catch (err) {
+    console.error("❌ Error enviando notificación:", err.response?.data || err.message);
+  }
+}
+
+// --- Función para obtener estadísticas de un partido ---
 function getEventStatistics(eventId, home, away) {
   const options = {
     method: "GET",
     hostname: "sportscore1.p.rapidapi.com",
     path: `/events/${eventId}/statistics`,
     headers: {
-      "x-rapidapi-key": RAPIDAPI_KEY,
+      "x-rapidapi-key": FOOTBALL_API_KEY,
       "x-rapidapi-host": "sportscore1.p.rapidapi.com"
     }
   };
@@ -26,13 +70,14 @@ function getEventStatistics(eventId, home, away) {
   req.end();
 }
 
+// --- Función para obtener partidos en vivo ---
 function getLiveEvents(sportId) {
   const options = {
     method: "GET",
     hostname: "sportscore1.p.rapidapi.com",
     path: `/sports/${sportId}/events/live`,
     headers: {
-      "x-rapidapi-key": RAPIDAPI_KEY,
+      "x-rapidapi-key": FOOTBALL_API_KEY,
       "x-rapidapi-host": "sportscore1.p.rapidapi.com"
     }
   };
@@ -81,6 +126,7 @@ setInterval(() => {
   getLiveEvents(1); // ⚽ Fútbol
   getLiveEvents(2); // 🏀 Básquet
 }, 5 * 60 * 1000);
+
 
 
 
