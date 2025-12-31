@@ -18,7 +18,7 @@ app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
 
-// --- Función para enviar notificación (la dejamos lista por si quieres usarla) ---
+// --- Función para enviar notificación (lista para usar si quieres) ---
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -60,17 +60,20 @@ function getEventIncidents(eventId, home, away, score, status) {
       try {
         const incidents = JSON.parse(data).data || [];
 
-        // Contar córneres
+        // Mostrar incidents crudos para depuración
+        console.log("📋 Incidents crudos para", home, "vs", away, ":", JSON.stringify(incidents, null, 2));
+
+        // Contar córneres (normalizando tipos)
         const corners = incidents.filter(
           inc => inc.incident_type && inc.incident_type.toLowerCase().includes("corner")
         ).length;
 
-        // Contar tarjetas rojas
+        // Contar tarjetas rojas (normalizando tipos)
         const redCards = incidents.filter(
-          inc => inc.incident_type && inc.incident_type.toLowerCase().includes("red_card")
+          inc => inc.incident_type && inc.incident_type.toLowerCase().includes("red")
         ).length;
 
-        // Mostrar en logs
+        // Mostrar resumen en logs
         console.log("📊 Partido:", home, "vs", away, "| Estado:", status, "| Marcador:", score);
         console.log("   ➡️ Córneres detectados:", corners);
         console.log("   ➡️ Tarjetas rojas detectadas:", redCards);
@@ -129,6 +132,7 @@ setInterval(() => {
   getLiveEvents(1); // ⚽ Fútbol
   getLiveEvents(2); // 🏀 Básquet
 }, 5 * 60 * 1000);
+
 
 
 
