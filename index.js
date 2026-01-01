@@ -89,7 +89,7 @@ setInterval(() => {
   console.log("🔄 Buscando partidos en vivo...");
   getLiveEvents(1); // ⚽ Fútbol
   getLiveEvents(3); // 🏀 Básquet
-}, 5 * 60 * 1000);
+}, 20 * 60 * 1000);
 
 
 
