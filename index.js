@@ -83,7 +83,7 @@ app.get("/live-basket", (req, res) => {
   reqApi.end();
 });
 
-// --- Función para revisar partidos y notificar cambios de estado ---
+// --- Función para revisar partidos y notificar solo Q4 ---
 function getLiveBasketEvents() {
   const today = new Date().toISOString().split("T")[0];
   const options = {
@@ -121,15 +121,15 @@ function getLiveBasketEvents() {
 
           const lastStatus = notifiedGames.get(key);
 
-          // Notificar solo si el estado cambió y está en curso
-          if (["Q1","Q2","Q3","Q4","OT","HT","BT"].includes(status) && lastStatus !== status) {
-            const msg = `📢 ${home} vs ${away} (${league}, ${country})\n🏀 Estado: ${status} | Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
+          // --- Notificar solo la primera vez que entra en Q4 ---
+          if (status === "Q4" && lastStatus !== "Q4") {
+            const msg = `📢 Último cuarto: ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
             console.log(msg);
             sendNotification(msg);
-            notifiedGames.set(key, status);
+            notifiedGames.set(key, "Q4");
           }
 
-          // Limpiar cuando termina
+          // --- Limpiar cuando termina ---
           if (["FT", "AOT"].includes(status) && notifiedGames.has(key)) {
             console.log(`✅ Partido terminado: ${key}, limpiando de la lista`);
             notifiedGames.delete(key);
