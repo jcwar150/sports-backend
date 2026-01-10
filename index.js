@@ -9,8 +9,8 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Lista en memoria de partidos ya notificados
-let notifiedGames = new Set();
+// Mapa en memoria de partidos notificados: id -> último estado
+let notifiedGames = new Map();
 
 app.get("/", (req, res) => {
   res.send("🏀 Worker de Basket corriendo en Render");
@@ -43,7 +43,7 @@ async function sendNotification(message) {
   }
 }
 
-// --- Endpoint para que Flutter consuma los partidos en vivo ---
+// --- Endpoint para que Flutter consuma los partidos del día ---
 app.get("/live-basket", (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const options = {
@@ -82,7 +82,7 @@ app.get("/live-basket", (req, res) => {
   reqApi.end();
 });
 
-// --- Función para revisar partidos en vivo y detectar prórrogas ---
+// --- Función para revisar partidos y detectar prórrogas ---
 function getLiveBasketEvents() {
   const today = new Date().toISOString().split("T")[0];
   const options = {
@@ -118,15 +118,22 @@ function getLiveBasketEvents() {
 
           console.log(`🔎 ${home} vs ${away} | Estado: ${status} | Liga: ${league} | País: ${country}`);
 
-          // --- Detectar prórroga y evitar duplicados ---
-          if (status === "OT" && !notifiedGames.has(id)) {
+          const lastStatus = notifiedGames.get(id);
+
+          // --- Notificar solo cuando cambia a OT ---
+          if (status === "OT" && lastStatus !== "OT") {
             const msg = `⏱️ PRÓRROGA en ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
             console.log(msg);
             sendNotification(msg);
-            notifiedGames.add(id); // marcar como notificado
+            notifiedGames.set(id, "OT");
           }
 
-          // --- Cuando termina el partido, limpiar de la lista ---
+          // --- Actualizar estado en memoria ---
+          if (!lastStatus || lastStatus !== status) {
+            notifiedGames.set(id, status);
+          }
+
+          // --- Limpiar cuando termina ---
           if (["FT", "AOT"].includes(status) && notifiedGames.has(id)) {
             console.log(`✅ Partido terminado: ${home} vs ${away}, limpiando de la lista`);
             notifiedGames.delete(id);
@@ -146,9 +153,10 @@ function getLiveBasketEvents() {
 
 // --- Loop cada 2 minutos ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos de basket en vivo...");
+  console.log("🔄 Buscando partidos de basket...");
   getLiveBasketEvents();
-}, 2 * 60 * 1000);
+}, 1 * 60 * 1000);
+
 
 
 
