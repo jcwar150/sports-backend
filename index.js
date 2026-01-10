@@ -117,22 +117,19 @@ function getLiveBasketEvents() {
           const country = game.country?.name || "País desconocido";
           const status = game.status?.short || "";
 
-          // Solo último cuarto
-          if (status === "Q4") {
-            console.log(`🔎 ${key} | Estado: ${status} | Liga: ${league} | País: ${country}`);
+          console.log(`🔎 ${key} | Estado: ${status} | Liga: ${league} | País: ${country}`);
 
-            const lastStatus = notifiedGames.get(key);
+          const lastStatus = notifiedGames.get(key);
 
-            // Notificar solo si no se ha notificado antes en Q4
-            if (lastStatus !== "Q4") {
-              const msg = `📢 Último cuarto: ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
-              console.log(msg);
-              sendNotification(msg);
-              notifiedGames.set(key, "Q4");
-            }
+          // --- Notificar solo la primera vez que entra en Q4 ---
+          if (status === "Q4" && lastStatus !== "Q4") {
+            const msg = `📢 Último cuarto: ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
+            console.log(msg);
+            sendNotification(msg);
+            notifiedGames.set(key, "Q4");
           }
 
-          // Limpiar cuando termina
+          // --- Limpiar cuando termina ---
           if (["FT", "AOT"].includes(status) && notifiedGames.has(key)) {
             console.log(`✅ Partido terminado: ${key}, limpiando de la lista`);
             notifiedGames.delete(key);
