@@ -43,7 +43,7 @@ async function sendNotification(message) {
   }
 }
 
-// --- Endpoint para que Flutter consuma solo partidos en Q4 ---
+// --- Endpoint para que Flutter consuma solo partidos en OT ---
 app.get("/live-basket", (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const options = {
@@ -62,7 +62,7 @@ app.get("/live-basket", (req, res) => {
       try {
         const json = JSON.parse(data);
         const games = json.response
-          .filter(g => g.status?.short === "Q4") // solo último cuarto
+          .filter(g => g.status?.short === "OT") // solo prórrogas
           .map(game => ({
             home: game.teams?.home?.name,
             away: game.teams?.away?.name,
@@ -83,7 +83,7 @@ app.get("/live-basket", (req, res) => {
   reqApi.end();
 });
 
-// --- Función para revisar partidos y notificar solo Q4 ---
+// --- Función para revisar partidos y notificar solo OT ---
 function getLiveBasketEvents() {
   const today = new Date().toISOString().split("T")[0];
   const options = {
@@ -121,12 +121,12 @@ function getLiveBasketEvents() {
 
           const lastStatus = notifiedGames.get(key);
 
-          // --- Notificar solo la primera vez que entra en Q4 ---
-          if (status === "Q4" && lastStatus !== "Q4") {
-            const msg = `📢 Último cuarto: ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
+          // --- Notificar solo la primera vez que entra en OT ---
+          if (status === "OT" && lastStatus !== "OT") {
+            const msg = `⏱️ PRÓRROGA en ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
             console.log(msg);
             sendNotification(msg);
-            notifiedGames.set(key, "Q4");
+            notifiedGames.set(key, "OT");
           }
 
           // --- Limpiar cuando termina ---
@@ -149,7 +149,7 @@ function getLiveBasketEvents() {
 
 // --- Loop cada 2 minutos ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos de basket en último cuarto...");
+  console.log("🔄 Buscando partidos de basket en prórroga...");
   getLiveBasketEvents();
 }, 1 * 60 * 1000);
 
