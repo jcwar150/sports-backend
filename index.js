@@ -43,7 +43,7 @@ async function sendNotification(message) {
   }
 }
 
-// --- Endpoint para que Flutter consuma partidos en curso ---
+// --- Endpoint para que Flutter consuma solo partidos en Q4 ---
 app.get("/live-basket", (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const options = {
@@ -62,7 +62,7 @@ app.get("/live-basket", (req, res) => {
       try {
         const json = JSON.parse(data);
         const games = json.response
-          .filter(g => ["Q1","Q2","Q3","Q4","OT","HT","BT"].includes(g.status?.short)) // todos los partidos en curso
+          .filter(g => g.status?.short === "Q4") // solo último cuarto
           .map(game => ({
             home: game.teams?.home?.name,
             away: game.teams?.away?.name,
@@ -149,7 +149,7 @@ function getLiveBasketEvents() {
 
 // --- Loop cada 2 minutos ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos de basket en curso...");
+  console.log("🔄 Buscando partidos de basket en último cuarto...");
   getLiveBasketEvents();
 }, 1 * 60 * 1000);
 
