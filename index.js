@@ -42,10 +42,11 @@ async function sendNotification(message) {
 
 // --- Endpoint para que Flutter consuma los partidos en vivo ---
 app.get("/live-basket", (req, res) => {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
   const options = {
     method: "GET",
     hostname: "v1.basketball.api-sports.io",
-    path: "/games?live=all",
+    path: `/games?date=${today}&timezone=Europe/London`,
     headers: {
       "x-apisports-key": API_SPORT_KEY
     }
@@ -57,15 +58,17 @@ app.get("/live-basket", (req, res) => {
     apiRes.on("end", () => {
       try {
         const json = JSON.parse(data);
-        const games = json.response.map(game => ({
-          home: game.teams?.home?.name,
-          away: game.teams?.away?.name,
-          pointsHome: game.scores?.home?.total,
-          pointsAway: game.scores?.away?.total,
-          league: game.league?.name,
-          country: game.country?.name,
-          status: game.status?.long
-        }));
+        const games = json.response
+          .filter(g => ["Q1","Q2","Q3","Q4","OT"].includes(g.status?.short)) // solo partidos en curso
+          .map(game => ({
+            home: game.teams?.home?.name,
+            away: game.teams?.away?.name,
+            pointsHome: game.scores?.home?.total,
+            pointsAway: game.scores?.away?.total,
+            league: game.league?.name,
+            country: game.country?.name,
+            status: game.status?.short
+          }));
         res.json({ games });
       } catch (err) {
         res.status(500).json({ error: "Error parseando respuesta" });
@@ -79,10 +82,11 @@ app.get("/live-basket", (req, res) => {
 
 // --- Función para revisar partidos en vivo y detectar prórrogas ---
 function getLiveBasketEvents() {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
   const options = {
     method: "GET",
     hostname: "v1.basketball.api-sports.io",
-    path: "/games?live=all",
+    path: `/games?date=${today}&timezone=Europe/London`,
     headers: {
       "x-apisports-key": API_SPORT_KEY
     }
@@ -96,7 +100,7 @@ function getLiveBasketEvents() {
         const json = JSON.parse(data);
 
         if (!json.response || json.response.length === 0) {
-          console.log("⏭️ No hay partidos de basket en vivo ahora mismo");
+          console.log("⏭️ No hay partidos de basket para hoy");
           return;
         }
 
@@ -107,12 +111,12 @@ function getLiveBasketEvents() {
           const pointsAway = game.scores?.away?.total || 0;
           const league = game.league?.name || "Liga desconocida";
           const country = game.country?.name || "País desconocido";
-          const status = game.status?.long?.toLowerCase() || "";
+          const status = game.status?.short || "";
 
-          console.log(`🔎 Revisando: ${home} vs ${away} | Estado: ${status} | Liga: ${league} | País: ${country}`);
+          console.log(`🔎 ${home} vs ${away} | Estado: ${status} | Liga: ${league} | País: ${country}`);
 
           // --- Detectar prórroga ---
-          if (status.includes("overtime")) {
+          if (status === "OT") {
             const msg = `⏱️ PRÓRROGA en ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
             console.log(msg);
             sendNotification(msg);
