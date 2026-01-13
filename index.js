@@ -34,7 +34,6 @@ setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT y Q4 con diferencia ≥20)...");
   getLiveBasketEvents();
 }, 1 * 60 * 1000);
-;
 
 
 
