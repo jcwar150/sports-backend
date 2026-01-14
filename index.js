@@ -218,7 +218,8 @@ function getLiveBasketEvents() {
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET/AOT y Q4 con diferencia ≥20 o ≤5)...");
   getLiveBasketEvents();
-}, 1 * 60 * 100
+}, 1 * 60 * 1000);
+
 
 
 
