@@ -74,7 +74,9 @@ app.get("/live-basket", (req, res) => {
               const time = g.status?.timer || "";
               if (time) {
                 const [min] = time.split(":").map(Number);
-                if (min <= 5 && (diff >= 20 || diff <= 5)) return true;
+                const quarterDuration = 12; // minutos por cuarto (ajusta según liga)
+                const remaining = quarterDuration - min;
+                if (remaining <= 5 && (diff >= 20 || diff <= 5)) return true;
               }
             }
             return false;
@@ -179,16 +181,19 @@ function getLiveBasketEvents() {
             notifiedGames.set(key, state);
           }
 
-          // --- Último cuarto, ≤5 min ---
+          // --- Último cuarto, ≤5 min restantes ---
           if (status === "Q4" && time) {
             const [min] = time.split(":").map(Number);
-            if (min <= 5) {
+            const quarterDuration = 12; // minutos por cuarto (ajusta según liga)
+            const remaining = quarterDuration - min;
+
+            if (remaining <= 5) {
               if (diff >= 20 && !state.q4_20) {
-                const msg = `⚡ Último cuarto (≤5 min, diferencia ≥20)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
+                const msg = `⚡ Último cuarto (≤5 min restantes, diferencia ≥20)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
                 state.q4_20 = true;
               } else if (diff <= 5 && !state.q4_5) {
-                const msg = `🔥 Último cuarto (≤5 min, diferencia ≤5)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
+                const msg = `🔥 Último cuarto (≤5 min restantes, diferencia ≤5)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
                 state.q4_5 = true;
               }
