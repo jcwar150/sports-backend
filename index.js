@@ -12,6 +12,36 @@ const PORT = process.env.PORT || 3000;
 // Estado de notificaciones por partido
 let notifiedGames = new Map();
 
+// Registro diario de partidos
+let dailyGames = {};
+let currentDate = new Date().toISOString().split("T")[0];
+
+function resetDailyGamesIfNeeded() {
+  const today = new Date().toISOString().split("T")[0];
+  if (today !== currentDate) {
+    console.log("🔄 Nuevo día, reseteando registro de partidos");
+    dailyGames = {};
+    currentDate = today;
+  }
+}
+
+function saveGameRecord(game) {
+  const key = `${game.teams?.home?.name} vs ${game.teams?.away?.name}`;
+  if (!dailyGames[key]) {
+    dailyGames[key] = {
+      home: game.teams?.home?.name,
+      away: game.teams?.away?.name,
+      league: game.league?.name,
+      country: game.country?.name,
+      status: game.status?.short,
+      time: game.status?.timer || null,
+      pointsHome: game.scores?.home?.total,
+      pointsAway: game.scores?.away?.total
+    };
+    console.log(`📝 Partido registrado: ${key}`);
+  }
+}
+
 app.get("/", (req, res) => {
   res.send("🏀 Worker de Basket corriendo en Render");
 });
@@ -45,6 +75,7 @@ async function sendNotification(message) {
 
 // --- Endpoint: partidos que cumplen condiciones ---
 app.get("/live-basket", (req, res) => {
+  resetDailyGamesIfNeeded();
   const today = new Date().toISOString().split("T")[0];
   const options = {
     method: "GET",
@@ -72,27 +103,29 @@ app.get("/live-basket", (req, res) => {
               const time = g.status?.timer || "";
               if (time) {
                 const [min] = time.split(":").map(Number);
-                // Detectar duración del cuarto según liga
                 const leagueName = g.league?.name || "";
                 let quarterDuration = 10;
                 if (leagueName.toLowerCase().includes("nba")) quarterDuration = 12;
 
-                const remaining = quarterDuration - min; // tiempo restante
+                const remaining = quarterDuration - min; // timer = transcurrido
                 if (remaining <= 5 && (diff >= 20 || diff <= 5)) return true;
               }
             }
             return false;
           })
-          .map(game => ({
-            home: game.teams?.home?.name,
-            away: game.teams?.away?.name,
-            pointsHome: game.scores?.home?.total,
-            pointsAway: game.scores?.away?.total,
-            league: game.league?.name,
-            country: game.country?.name,
-            status: game.status?.short,
-            time: game.status?.timer || null
-          }));
+          .map(game => {
+            saveGameRecord(game);
+            return {
+              home: game.teams?.home?.name,
+              away: game.teams?.away?.name,
+              pointsHome: game.scores?.home?.total,
+              pointsAway: game.scores?.away?.total,
+              league: game.league?.name,
+              country: game.country?.name,
+              status: game.status?.short,
+              time: game.status?.timer || null
+            };
+          });
         res.json({ games });
       } catch (err) {
         res.status(500).json({ error: "Error parseando respuesta" });
@@ -104,7 +137,13 @@ app.get("/live-basket", (req, res) => {
   reqApi.end();
 });
 
-// --- Endpoint: eventos de un partido (probar timeouts) ---
+// --- Endpoint: registro diario ---
+app.get("/daily-record", (req, res) => {
+  resetDailyGamesIfNeeded();
+  res.json({ date: currentDate, games: dailyGames });
+});
+
+// --- Endpoint: eventos de un partido ---
 app.get("/game-events/:id", (req, res) => {
   const gameId = req.params.id;
   const options = {
@@ -133,6 +172,7 @@ app.get("/game-events/:id", (req, res) => {
 
 // --- Loop de revisión y notificación ---
 function getLiveBasketEvents() {
+  resetDailyGamesIfNeeded();
   const today = new Date().toISOString().split("T")[0];
   const options = {
     method: "GET",
@@ -154,6 +194,8 @@ function getLiveBasketEvents() {
         }
 
         json.response.forEach(game => {
+          saveGameRecord(game);
+
           const home = game.teams?.home?.name || "Home";
           const away = game.teams?.away?.name || "Away";
           const key = `${home} vs ${away}`;
@@ -181,15 +223,12 @@ function getLiveBasketEvents() {
           // --- Último cuarto, ≤5 min restantes (timer = transcurrido) ---
           if (status === "Q4" && time) {
             const [min] = time.split(":").map(Number);
-
-            // Detectar duración del cuarto según liga
             let quarterDuration = 10;
             if (league.toLowerCase().includes("nba")) quarterDuration = 12;
-
-            const remaining = quarterDuration - min; // tiempo restante
+            const remaining = quarterDuration - min;
 
             console.log(
-              `⏱️ ${home} vs ${away} | Liga: ${league} | País: ${country} | Tiempo transcurrido: ${time} | Restante: ${remaining} min`
+              `⏱️ ${home} vs ${away} | Liga: ${league} | País: ${country} | Transcurrido: ${time} | Restante: ${remaining} min`
             );
 
             if (remaining <= 5) {
@@ -222,13 +261,11 @@ function getLiveBasketEvents() {
   req.end();
 }
 
-// --- Loop cada 2 minutos ---
+// --- Loop cada minuto ---
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥20 o ≤5)...");
   getLiveBasketEvents();
-}, 1 * 60 * 1000);
-;
-
+}, 60 * 1000);
 
 
 
