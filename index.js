@@ -74,9 +74,7 @@ app.get("/live-basket", (req, res) => {
               const time = g.status?.timer || "";
               if (time) {
                 const [min] = time.split(":").map(Number);
-                const quarterDuration = 12; // minutos por cuarto (ajusta según liga)
-                const remaining = quarterDuration - min;
-                if (remaining <= 5 && (diff >= 20 || diff <= 5)) return true;
+                if (min <= 5 && (diff >= 20 || diff <= 5)) return true;
               }
             }
             return false;
@@ -184,16 +182,16 @@ function getLiveBasketEvents() {
           // --- Último cuarto, ≤5 min restantes ---
           if (status === "Q4" && time) {
             const [min] = time.split(":").map(Number);
-            const quarterDuration = 12; // minutos por cuarto (ajusta según liga)
-            const remaining = quarterDuration - min;
 
-            if (remaining <= 5) {
+            console.log(`⏱️ Partido: ${home} vs ${away} | Liga: ${league} | País: ${country} | Tiempo restante: ${time}`);
+
+            if (min <= 5) {
               if (diff >= 20 && !state.q4_20) {
-                const msg = `⚡ Último cuarto (≤5 min restantes, diferencia ≥20)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
+                const msg = `⚡ Último cuarto (≤5 min restantes, diferencia ≥20)\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n⏱️ Tiempo restante: ${time}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
                 state.q4_20 = true;
               } else if (diff <= 5 && !state.q4_5) {
-                const msg = `🔥 Último cuarto (≤5 min restantes, diferencia ≤5)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
+                const msg = `🔥 Último cuarto (≤5 min restantes, diferencia ≤5)\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n⏱️ Tiempo restante: ${time}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
                 state.q4_5 = true;
               }
@@ -223,7 +221,7 @@ function getLiveBasketEvents() {
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥20 o ≤5)...");
   getLiveBasketEvents();
-}, 2 * 60 * 1000);
+}, 1 * 60 * 1000);
 
 
 
