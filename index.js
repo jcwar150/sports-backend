@@ -68,15 +68,15 @@ app.get("/live-basket", (req, res) => {
             const pointsAway = g.scores?.away?.total || 0;
             const diff = Math.abs(pointsHome - pointsAway);
 
-            // condición 1: prórroga
-            if (status === "OT") return true;
+            // condición 1: prórroga (OT, ET, AOT)
+            if (["OT", "ET", "AOT"].includes(status)) return true;
 
-            // condición 2: último cuarto con diferencia >=20 y faltando <= 5 min
+            // condición 2: último cuarto con diferencia >=20 o <=5 y faltando <= 5 min
             if (status === "Q4") {
               const time = g.status?.timer || ""; // ej: "05:00"
               if (time) {
                 const [min] = time.split(":").map(Number);
-                if (min <= 5 && diff >= 20) return true;
+                if (min <= 5 && (diff >= 20 || diff <= 5)) return true;
               }
             }
             return false;
@@ -89,9 +89,39 @@ app.get("/live-basket", (req, res) => {
             league: game.league?.name,
             country: game.country?.name,
             status: game.status?.short,
-            time: game.status?.timer || null
+            time: game.status?.timer || null,
+            statistics: game.statistics || null // si la API expone estadísticas
           }));
         res.json({ games });
+      } catch (err) {
+        res.status(500).json({ error: "Error parseando respuesta" });
+      }
+    });
+  });
+
+  reqApi.on("error", err => res.status(500).json({ error: err.message }));
+  reqApi.end();
+});
+
+// --- Endpoint para ver eventos de un partido (probar timeouts) ---
+app.get("/game-events/:id", (req, res) => {
+  const gameId = req.params.id;
+  const options = {
+    method: "GET",
+    hostname: "v1.basketball.api-sports.io",
+    path: `/events?game=${gameId}&timezone=Europe/London`,
+    headers: {
+      "x-apisports-key": API_SPORT_KEY
+    }
+  };
+
+  const reqApi = https.request(options, apiRes => {
+    let data = "";
+    apiRes.on("data", chunk => (data += chunk));
+    apiRes.on("end", () => {
+      try {
+        const json = JSON.parse(data);
+        res.json(json); // devolvemos todo para inspección
       } catch (err) {
         res.status(500).json({ error: "Error parseando respuesta" });
       }
@@ -143,22 +173,25 @@ function getLiveBasketEvents() {
           const lastStatus = notifiedGames.get(key);
 
           // --- Condición 1: prórroga ---
-          if (status === "OT" && lastStatus !== "OT") {
-            const msg = `⏱️ PRÓRROGA en ${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
-            console.log(msg);
+          if (["OT", "ET", "AOT"].includes(status) && lastStatus !== status) {
+            const msg = `⏱️ PRÓRROGA en ${home} vs ${away} (${league}, ${country})\n🏀 ${pointsHome} - ${pointsAway}`;
             sendNotification(msg);
-            notifiedGames.set(key, "OT");
+            notifiedGames.set(key, status);
           }
 
-          // --- Condición 2: último cuarto, <=5 min y diferencia >=20 ---
-          if (status === "Q4" && lastStatus !== "Q4") {
-            if (time) {
-              const [min] = time.split(":").map(Number);
-              if (min <= 5 && diff >= 20) {
-                const msg = `⚡ Último cuarto (≤5 min, diferencia ≥20)\n${home} vs ${away} (${league}, ${country})\n🏀 Marcador: ${home} ${pointsHome} - ${away} ${pointsAway}`;
-                console.log(msg);
+          // --- Condición 2: último cuarto, ≤5 min ---
+          if (status === "Q4" && time) {
+            const [min] = time.split(":").map(Number);
+            if (min <= 5) {
+              if (diff >= 20 && lastStatus !== "Q4-20") {
+                const msg = `⚡ Último cuarto (≤5 min, diferencia ≥20)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
-                notifiedGames.set(key, "Q4");
+                notifiedGames.set(key, "Q4-20");
+              }
+              if (diff <= 5 && lastStatus !== "Q4-5") {
+                const msg = `🔥 Último cuarto (≤5 min, diferencia ≤5)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
+                sendNotification(msg);
+                notifiedGames.set(key, "Q4-5");
               }
             }
           }
@@ -183,9 +216,10 @@ function getLiveBasketEvents() {
 
 // --- Loop cada 2 minutos ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos de basket (OT y Q4 con diferencia ≥20)...");
+  console.log("🔄 Buscando partidos de basket (OT/ET/AOT y Q4 con diferencia ≥20 o ≤5)...");
   getLiveBasketEvents();
-}, 1 * 60 * 1000);
+}, 1 * 60 * 100
+
 
 
 
