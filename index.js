@@ -43,7 +43,7 @@ async function sendNotification(message) {
   }
 }
 
-// --- Endpoint para que Flutter consuma partidos que cumplen condiciones ---
+// --- Endpoint para partidos que cumplen condiciones ---
 app.get("/live-basket", (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const options = {
@@ -68,10 +68,8 @@ app.get("/live-basket", (req, res) => {
             const pointsAway = g.scores?.away?.total || 0;
             const diff = Math.abs(pointsHome - pointsAway);
 
-            // condición 1: prórroga (OT, ET, AOT)
-            if (["OT", "ET", "AOT"].includes(status)) return true;
+            if (["OT", "ET"].includes(status)) return true;
 
-            // condición 2: último cuarto con diferencia >=20 o <=5 y faltando <= 5 min
             if (status === "Q4") {
               const time = g.status?.timer || "";
               if (time) {
@@ -121,7 +119,7 @@ app.get("/game-events/:id", (req, res) => {
     apiRes.on("end", () => {
       try {
         const json = JSON.parse(data);
-        res.json(json); // devolvemos todo para inspección
+        res.json(json);
       } catch (err) {
         res.status(500).json({ error: "Error parseando respuesta" });
       }
@@ -168,21 +166,20 @@ function getLiveBasketEvents() {
           const time = game.status?.timer || "";
           const diff = Math.abs(pointsHome - pointsAway);
 
-          // Inicializar estado si no existe
           if (!notifiedGames.has(key)) {
             notifiedGames.set(key, { ot: false, q4_20: false, q4_5: false });
           }
           const state = notifiedGames.get(key);
 
-          // --- Condición 1: prórroga ---
-          if (["OT", "ET", "AOT"].includes(status) && !state.ot) {
+          // --- Notificación de prórroga ---
+          if (["OT", "ET"].includes(status) && !state.ot) {
             const msg = `⏱️ PRÓRROGA en ${home} vs ${away} (${league}, ${country})\n🏀 ${pointsHome} - ${pointsAway}`;
             sendNotification(msg);
             state.ot = true;
             notifiedGames.set(key, state);
           }
 
-          // --- Condición 2: último cuarto, ≤5 min ---
+          // --- Último cuarto, ≤5 min ---
           if (status === "Q4" && time) {
             const [min] = time.split(":").map(Number);
             if (min <= 5) {
@@ -190,8 +187,7 @@ function getLiveBasketEvents() {
                 const msg = `⚡ Último cuarto (≤5 min, diferencia ≥20)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
                 state.q4_20 = true;
-              }
-              if (diff <= 5 && !state.q4_5) {
+              } else if (diff <= 5 && !state.q4_5) {
                 const msg = `🔥 Último cuarto (≤5 min, diferencia ≤5)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
                 state.q4_5 = true;
@@ -200,7 +196,7 @@ function getLiveBasketEvents() {
             }
           }
 
-          // --- Limpiar cuando termina ---
+          // --- Limpieza cuando termina ---
           if (["FT", "AOT"].includes(status)) {
             console.log(`✅ Partido terminado: ${key}, limpiando de la lista`);
             notifiedGames.delete(key);
@@ -220,9 +216,10 @@ function getLiveBasketEvents() {
 
 // --- Loop cada 2 minutos ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos de basket (OT/ET/AOT y Q4 con diferencia ≥20 o ≤5)...");
+  console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥20 o ≤5)...");
   getLiveBasketEvents();
-}, 1 * 60 * 1000);
+}, 2 * 60 * 1000);
+
 
 
 
