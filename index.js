@@ -9,7 +9,7 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Guardamos partidos notificados: "Home vs Away" -> último estado
+// Guardamos estado de notificaciones por partido
 let notifiedGames = new Map();
 
 app.get("/", (req, res) => {
@@ -73,7 +73,7 @@ app.get("/live-basket", (req, res) => {
 
             // condición 2: último cuarto con diferencia >=20 o <=5 y faltando <= 5 min
             if (status === "Q4") {
-              const time = g.status?.timer || ""; // ej: "05:00"
+              const time = g.status?.timer || "";
               if (time) {
                 const [min] = time.split(":").map(Number);
                 if (min <= 5 && (diff >= 20 || diff <= 5)) return true;
@@ -90,7 +90,7 @@ app.get("/live-basket", (req, res) => {
             country: game.country?.name,
             status: game.status?.short,
             time: game.status?.timer || null,
-            statistics: game.statistics || null // si la API expone estadísticas
+            statistics: game.statistics || null
           }));
         res.json({ games });
       } catch (err) {
@@ -168,36 +168,40 @@ function getLiveBasketEvents() {
           const time = game.status?.timer || "";
           const diff = Math.abs(pointsHome - pointsAway);
 
-          console.log(`🔎 ${key} | Estado: ${status} | Tiempo: ${time} | Liga: ${league} | País: ${country}`);
-
-          const lastStatus = notifiedGames.get(key);
+          // Inicializar estado si no existe
+          if (!notifiedGames.has(key)) {
+            notifiedGames.set(key, { ot: false, q4_20: false, q4_5: false });
+          }
+          const state = notifiedGames.get(key);
 
           // --- Condición 1: prórroga ---
-          if (["OT", "ET", "AOT"].includes(status) && lastStatus !== status) {
+          if (["OT", "ET", "AOT"].includes(status) && !state.ot) {
             const msg = `⏱️ PRÓRROGA en ${home} vs ${away} (${league}, ${country})\n🏀 ${pointsHome} - ${pointsAway}`;
             sendNotification(msg);
-            notifiedGames.set(key, status);
+            state.ot = true;
+            notifiedGames.set(key, state);
           }
 
           // --- Condición 2: último cuarto, ≤5 min ---
           if (status === "Q4" && time) {
             const [min] = time.split(":").map(Number);
             if (min <= 5) {
-              if (diff >= 20 && lastStatus !== "Q4-20") {
+              if (diff >= 20 && !state.q4_20) {
                 const msg = `⚡ Último cuarto (≤5 min, diferencia ≥20)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
-                notifiedGames.set(key, "Q4-20");
+                state.q4_20 = true;
               }
-              if (diff <= 5 && lastStatus !== "Q4-5") {
+              if (diff <= 5 && !state.q4_5) {
                 const msg = `🔥 Último cuarto (≤5 min, diferencia ≤5)\n${home} vs ${away}\n🏀 ${pointsHome} - ${pointsAway}`;
                 sendNotification(msg);
-                notifiedGames.set(key, "Q4-5");
+                state.q4_5 = true;
               }
+              notifiedGames.set(key, state);
             }
           }
 
           // --- Limpiar cuando termina ---
-          if (["FT", "AOT"].includes(status) && notifiedGames.has(key)) {
+          if (["FT", "AOT"].includes(status)) {
             console.log(`✅ Partido terminado: ${key}, limpiando de la lista`);
             notifiedGames.delete(key);
           }
@@ -219,6 +223,7 @@ setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET/AOT y Q4 con diferencia ≥20 o ≤5)...");
   getLiveBasketEvents();
 }, 1 * 60 * 1000);
+
 
 
 
