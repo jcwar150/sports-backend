@@ -67,6 +67,7 @@ async function sendNotification(message) {
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
+}
 app.get("/live-basket", (req, res) => {
   resetDailyGamesIfNeeded();
   const today = new Date().toISOString().split("T")[0];
