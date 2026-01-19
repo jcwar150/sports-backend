@@ -226,7 +226,7 @@ Liga: ${league} | País: ${country}
             }
           }
 
-          // --- Notificación al finalizar el partido ---
+        // --- Notificación al finalizar el partido ---
           if (["FT", "AOT"].includes(status) && !state.final) {
             const totalPoints = pointsHome + pointsAway;
             const msg = `✅ Partido terminado: ${home} vs ${away}
@@ -235,7 +235,24 @@ Liga: ${league} | País: ${country}
 📊 Total puntos: ${totalPoints}`;
             sendNotification(msg);
             state.final = true;
+            notifiedGames.delete(key);
+          }
+        });
+      } catch (err) {
+        console.error("❌ Error parseando respuesta basket:", err.message);
+      }
+    });
+  });
 
+  req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
+  req.end();
+}
+
+// --- Loop cada minuto ---
+setInterval(() => {
+  console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥30 o ≤2)...");
+  getLiveBasketEvents();
+}, 60 * 1000);
 
 
 
