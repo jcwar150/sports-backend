@@ -9,10 +9,7 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Estado de notificaciones por partido
 let notifiedGames = new Map();
-
-// Registro diario de partidos
 let dailyGames = {};
 let currentDate = new Date().toISOString().split("T")[0];
 
@@ -50,7 +47,6 @@ app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
 
-// --- Notificaciones OneSignal ---
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -72,7 +68,6 @@ async function sendNotification(message) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
-// --- Endpoint: partidos que cumplen condiciones ---
 app.get("/live-basket", (req, res) => {
   resetDailyGamesIfNeeded();
   const today = new Date().toISOString().split("T")[0];
@@ -136,7 +131,6 @@ app.get("/live-basket", (req, res) => {
   reqApi.end();
 });
 
-// --- Endpoint: registro diario ---
 app.get("/daily-record", (req, res) => {
   resetDailyGamesIfNeeded();
   res.json({ date: currentDate, games: dailyGames });
@@ -225,15 +219,17 @@ Liga: ${league} | País: ${country}
               notifiedGames.set(key, state);
             }
           }
-
-        // --- Notificación al finalizar el partido ---
+ // --- Notificación al finalizar el partido ---
           if (["FT", "AOT"].includes(status) && !state.final) {
-            const totalPoints = pointsHome + pointsAway;
-            const msg = `✅ Partido terminado: ${home} vs ${away}
+            // Solo notificar si el partido ya cumplió alguna condición inicial
+            if (state.ot || state.q4_30 || state.q4_2) {
+              const totalPoints = pointsHome + pointsAway;
+              const msg = `✅ Partido terminado: ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 Resultado final: ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}`;
-            sendNotification(msg);
+              sendNotification(msg);
+            }
             state.final = true;
             notifiedGames.delete(key);
           }
@@ -253,9 +249,6 @@ setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥30 o ≤2)...");
   getLiveBasketEvents();
 }, 60 * 1000);
-
-
-
 
 
 
