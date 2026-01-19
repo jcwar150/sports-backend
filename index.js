@@ -229,7 +229,7 @@ Liga: ${league} | País: ${country}
               notifiedGames.set(key, state);
             }
           }
- // --- Notificación al finalizar el partido ---
+// --- Notificación al finalizar el partido ---
           if (["FT", "AOT"].includes(status) && !state.final) {
             // Solo notificar si el partido ya cumplió alguna condición inicial
             if (state.ot || state.q4_30 || state.q4_2) {
@@ -261,7 +261,7 @@ Liga: ${league} | País: ${country}
             }
             state.final = true;
             notifiedGames.delete(key);
-            }
+          }
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -278,29 +278,3 @@ setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥30 o ≤2)...");
   getLiveBasketEvents();
 }, 60 * 1000);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
-
-
