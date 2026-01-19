@@ -261,7 +261,7 @@ Liga: ${league} | País: ${country}
             }
             state.final = true;
             notifiedGames.delete(key);
-          }
+            }
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -271,13 +271,14 @@ Liga: ${league} | País: ${country}
 
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
-}
+} // <-- cierre de la función getLiveBasketEvents
 
 // --- Loop cada minuto ---
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥30 o ≤2)...");
   getLiveBasketEvents();
 }, 60 * 1000);
+
 
 
 
