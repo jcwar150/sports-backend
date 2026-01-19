@@ -67,7 +67,6 @@ async function sendNotification(message) {
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
-}
 app.get("/live-basket", (req, res) => {
   resetDailyGamesIfNeeded();
   const today = new Date().toISOString().split("T")[0];
@@ -172,17 +171,24 @@ function getLiveBasketEvents() {
           const diff = Math.abs(pointsHome - pointsAway);
 
           if (!notifiedGames.has(key)) {
-            notifiedGames.set(key, { ot: false, q4_30: false, q4_2: false, final: false });
+            notifiedGames.set(key, { ot: false, q4_30: false, q4_2: false, final: false, initialTotal: null });
           }
           const state = notifiedGames.get(key);
 
           // --- Notificación de prórroga ---
           if (["OT", "ET"].includes(status) && !state.ot) {
+            const totalPoints = pointsHome + pointsAway;
+            const suggestion = totalPoints + 26;
+
             const msg = `⏱️ PRÓRROGA en ${home} vs ${away}
 Liga: ${league} | País: ${country}
-🏀 ${pointsHome} - ${pointsAway}`;
+🏀 ${pointsHome} - ${pointsAway}
+📊 Total puntos: ${totalPoints}
+💡 Sugerencia: ${suggestion}`;
             sendNotification(msg);
+
             state.ot = true;
+            state.initialTotal = totalPoints;
             notifiedGames.set(key, state);
           }
 
@@ -205,7 +211,9 @@ Liga: ${league} | País: ${country}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: ${suggestion}`;
                 sendNotification(msg);
+
                 state.q4_30 = true;
+                state.initialTotal = totalPoints;
               } else if (diff <= 2 && !state.q4_2) {
                 const msg = `🔥 Último cuarto (5 min restantes, diferencia ≤2)
 ${home} vs ${away}
@@ -214,7 +222,9 @@ Liga: ${league} | País: ${country}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: ${suggestion}`;
                 sendNotification(msg);
+
                 state.q4_2 = true;
+                state.initialTotal = totalPoints;
               }
               notifiedGames.set(key, state);
             }
@@ -224,10 +234,29 @@ Liga: ${league} | País: ${country}
             // Solo notificar si el partido ya cumplió alguna condición inicial
             if (state.ot || state.q4_30 || state.q4_2) {
               const totalPoints = pointsHome + pointsAway;
+              let resultText = "";
+
+              if (state.q4_2 || state.ot) {
+                // Caso partido cerrado o prórroga
+                if (totalPoints >= state.initialTotal + 26) {
+                  resultText = "Ganaste";
+                } else {
+                  resultText = "Perdiste";
+                }
+              } else if (state.q4_30) {
+                // Caso partido desbalanceado
+                if (totalPoints < state.initialTotal + 26) {
+                  resultText = "Ganaste";
+                } else {
+                  resultText = "Perdiste";
+                }
+              }
+
               const msg = `✅ Partido terminado: ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 Resultado final: ${pointsHome} - ${pointsAway}
-📊 Total puntos: ${totalPoints}`;
+📊 Total puntos: ${totalPoints}
+🎯 ${resultText}`;
               sendNotification(msg);
             }
             state.final = true;
@@ -249,6 +278,7 @@ setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥30 o ≤2)...");
   getLiveBasketEvents();
 }, 60 * 1000);
+
 
 
 
