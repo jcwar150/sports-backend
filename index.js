@@ -204,8 +204,8 @@ Liga: ${league} | País: ${country}
               const totalPoints = pointsHome + pointsAway;
               const suggestion = totalPoints + 26;
 
-              if (diff >= 30 && !state.q4_30) {
-                const msg = `⚡ Último cuarto (5 min restantes, diferencia ≥30)
+              if (diff >= 25 && !state.q4_30) {
+                const msg = `⚡ Último cuarto (5 min restantes, diferencia ≥25)
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -215,8 +215,8 @@ Liga: ${league} | País: ${country}
 
                 state.q4_30 = true;
                 state.initialTotal = totalPoints;
-              } else if (diff <= 2 && !state.q4_2) {
-                const msg = `🔥 Último cuarto (5 min restantes, diferencia ≤2)
+              } else if (diff <= 3 && !state.q4_2) {
+                const msg = `🔥 Último cuarto (5 min restantes, diferencia ≤3)
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
