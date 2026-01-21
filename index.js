@@ -230,39 +230,40 @@ Liga: ${league} | País: ${country}
               notifiedGames.set(key, state);
             }
           }
-// --- Notificación al finalizar el partido ---
-if (["FT", "AOT"].includes(status) && !state.final) {
-  // Solo notificar si el partido ya cumplió alguna condición inicial
-  if (state.ot || state.q4_30 || state.q4_2) {
-    const totalPoints = pointsHome + pointsAway;
-    let resultText = "";
+ // --- Notificación al finalizar el partido ---
+          if (["FT", "AOT"].includes(status) && !state.final) {
+            // Solo notificar si el partido ya cumplió alguna condición inicial
+            if (state.ot || state.q4_30 || state.q4_2) {
+              const totalPoints = pointsHome + pointsAway;
+              let resultText = "";
 
-    if (state.q4_2) {
-      // Partido cerrado: ganar si total final > inicial + 26
-      if (totalPoints > state.initialTotal + 26) {
-        resultText = "Ganaste";
-      } else {
-        resultText = "Perdiste";
-      }
-    } else if (state.q4_30 || state.ot) {
-      // Desbalanceado y prórroga: ganar si total final ≤ inicial + 26
-      if (totalPoints <= state.initialTotal + 26) {
-        resultText = "Ganaste";
-      } else {
-        resultText = "Perdiste";
-      }
-    }
+              if (state.q4_2) {
+                // Partido cerrado: ganar si total final > inicial + 26
+                if (totalPoints > state.initialTotal + 26) {
+                  resultText = "Ganaste";
+                } else {
+                  resultText = "Perdiste";
+                }
+              } else if (state.q4_30 || state.ot) {
+                // Desbalanceado y prórroga: ganar si total final ≤ inicial + 26
+                if (totalPoints <= state.initialTotal + 26) {
+                  resultText = "Ganaste";
+                } else {
+                  resultText = "Perdiste";
+                }
+              }
 
-    const msg = `✅ Partido terminado: ${home} vs ${away}
+              const msg = `✅ Partido terminado: ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 Resultado final: ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
 🎯 ${resultText}`;
-    sendNotification(msg);
-  }
-  state.final = true;
-  notifiedGames.delete(key);
-});
+              sendNotification(msg);
+            }
+            state.final = true;
+            notifiedGames.delete(key);
+          }
+        });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
       }
@@ -278,3 +279,4 @@ setInterval(() => {
   console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥30 o ≤2)...");
   getLiveBasketEvents();
 }, 60 * 1000);
+
