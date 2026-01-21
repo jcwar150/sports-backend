@@ -16,11 +16,25 @@ let currentDate = new Date().toISOString().split("T")[0];
 // Lista de países que no queremos incluir
 const excludedCountries = ["Kazakhstan", "Russia"];
 
+// Estadísticas diarias
+let dailyStats = {
+  closed: { won: 0, lost: 0 },
+  overtime: { won: 0, lost: 0 },
+  blowout: { won: 0, lost: 0 },
+  total: { won: 0, lost: 0 }
+};
+
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
-    console.log("🔄 Nuevo día, reseteando registro de partidos");
+    console.log("🔄 Nuevo día, reseteando registro de partidos y estadísticas");
     dailyGames = {};
+    dailyStats = {
+      closed: { won: 0, lost: 0 },
+      overtime: { won: 0, lost: 0 },
+      blowout: { won: 0, lost: 0 },
+      total: { won: 0, lost: 0 }
+    };
     currentDate = today;
   }
 }
@@ -138,7 +152,7 @@ app.get("/live-basket", (req, res) => {
 
 app.get("/daily-record", (req, res) => {
   resetDailyGamesIfNeeded();
-  res.json({ date: currentDate, games: dailyGames });
+  res.json({ date: currentDate, games: dailyGames, stats: dailyStats });
 });
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
@@ -238,26 +252,31 @@ Liga: ${league} | País: ${country}
               notifiedGames.set(key, state);
             }
           }
- // --- Notificación al finalizar el partido ---
+// --- Notificación al finalizar el partido ---
           if (["FT", "AOT"].includes(status) && !state.final) {
-            // Solo notificar si el partido ya cumplió alguna condición inicial
             if (state.ot || state.q4_30 || state.q4_2) {
               const totalPoints = pointsHome + pointsAway;
               let resultText = "";
 
               if (state.q4_2) {
-                // Partido cerrado: ganar si total final > inicial + 26
                 if (totalPoints > state.initialTotal + 26) {
                   resultText = "Ganaste";
+                  dailyStats.closed.won++;
+                  dailyStats.total.won++;
                 } else {
                   resultText = "Perdiste";
+                  dailyStats.closed.lost++;
+                  dailyStats.total.lost++;
                 }
               } else if (state.q4_30 || state.ot) {
-                // Desbalanceado y prórroga: ganar si total final ≤ inicial + 26
                 if (totalPoints <= state.initialTotal + 26) {
                   resultText = "Ganaste";
+                  dailyStats[state.q4_30 ? "blowout" : "overtime"].won++;
+                  dailyStats.total.won++;
                 } else {
                   resultText = "Perdiste";
+                  dailyStats[state.q4_30 ? "blowout" : "overtime"].lost++;
+                  dailyStats.total.lost++;
                 }
               }
 
@@ -280,11 +299,23 @@ Liga: ${league} | País: ${country}
 
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
-} // <-- cierre de la función getLiveBasketEvents
+} // cierre de getLiveBasketEvents
 
 // --- Loop cada minuto ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos de basket (OT/ET y Q4 con diferencia ≥30 o ≤2)...");
+  console.log("🔄 Buscando partidos de basket...");
   getLiveBasketEvents();
-}, 60 * 1000);
+}, 30 * 1000);
 
+// --- Resumen diario a las 23:59 ---
+function sendDailySummary() {
+  const calcPercent = (won, lost) => {
+    const total = won + lost;
+    return total === 0 ? "0%" : ((won / total) * 100).toFixed(1) + "%";
+  };
+
+  const msg = `📊 Resumen del día (${currentDate})
+- Partido cerrado: Ganados ${dailyStats.closed.won}, Perdidos ${dailyStats.closed.lost}, %Ganados ${calcPercent(dailyStats.closed.won, dailyStats.closed.lost)}
+- Prórroga: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
+- Desbalanceados: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
+- General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)
