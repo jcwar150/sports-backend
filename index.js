@@ -301,7 +301,7 @@ Liga: ${league} | País: ${country}
   req.end();
 } // cierre de getLiveBasketEvents
 
-// --- Loop cada minuto ---
+// --- Loop cada 30 segundos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket...");
   getLiveBasketEvents();
@@ -318,4 +318,23 @@ function sendDailySummary() {
 - Partido cerrado: Ganados ${dailyStats.closed.won}, Perdidos ${dailyStats.closed.lost}, %Ganados ${calcPercent(dailyStats.closed.won, dailyStats.closed.lost)}
 - Prórroga: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
 - Desbalanceados: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
-- General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}
+- General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
+
+  sendNotification(msg);
+
+  // Reset stats para el nuevo día
+  dailyStats = {
+    closed: { won: 0, lost: 0 },
+    overtime: { won: 0, lost: 0 },
+    blowout: { won: 0, lost: 0 },
+    total: { won: 0, lost: 0 }
+  };
+} // <-- cierre correcto de la función
+
+// --- Loop para enviar resumen a las 23:59 ---
+setInterval(() => {
+  const now = new Date();
+  if (now.getHours() === 23 && now.getMinutes() === 59) {
+    sendDailySummary();
+  }
+}, 60 * 1000);
