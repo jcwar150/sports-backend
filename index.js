@@ -13,6 +13,9 @@ let notifiedGames = new Map();
 let dailyGames = {};
 let currentDate = new Date().toISOString().split("T")[0];
 
+// Lista de países que no queremos incluir
+const excludedCountries = ["Kazakhstan", "Russia"];
+
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
@@ -86,6 +89,9 @@ app.get("/live-basket", (req, res) => {
         const json = JSON.parse(data);
         const games = json.response
           .filter(g => {
+            // Excluir países
+            if (excludedCountries.includes(g.country?.name)) return false;
+
             const status = g.status?.short;
             const pointsHome = g.scores?.home?.total || 0;
             const pointsAway = g.scores?.away?.total || 0;
@@ -97,9 +103,8 @@ app.get("/live-basket", (req, res) => {
               const time = g.status?.timer || "";
               if (time) {
                 const [min] = time.split(":").map(Number);
-                const leagueName = g.league?.name || "";
                 let quarterDuration = 10;
-                if (leagueName.toLowerCase().includes("nba")) quarterDuration = 12;
+                if ((g.league?.name || "").toLowerCase().includes("nba")) quarterDuration = 12;
 
                 const remaining = quarterDuration - min;
                 if (remaining === 5 && (diff >= 30 || diff <= 2)) return true;
@@ -158,6 +163,9 @@ function getLiveBasketEvents() {
         }
 
         json.response.forEach(game => {
+          // Excluir países
+          if (excludedCountries.includes(game.country?.name)) return;
+
           saveGameRecord(game);
 
           const home = game.teams?.home?.name || "Home";
@@ -204,8 +212,8 @@ Liga: ${league} | País: ${country}
               const totalPoints = pointsHome + pointsAway;
               const suggestion = totalPoints + 26;
 
-              if (diff >= 25 && !state.q4_30) {
-                const msg = `⚡ Último cuarto (5 min restantes, diferencia ≥25)
+              if (diff >= 30 && !state.q4_30) {
+                const msg = `⚡ Último cuarto (5 min restantes, diferencia ≥30)
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -215,8 +223,8 @@ Liga: ${league} | País: ${country}
 
                 state.q4_30 = true;
                 state.initialTotal = totalPoints;
-              } else if (diff <= 3 && !state.q4_2) {
-                const msg = `🔥 Último cuarto (5 min restantes, diferencia ≤3)
+              } else if (diff <= 2 && !state.q4_2) {
+                const msg = `🔥 Último cuarto (5 min restantes, diferencia ≤2)
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
