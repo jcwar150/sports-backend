@@ -120,7 +120,7 @@ app.get("/live-basket", (req, res) => {
                 if ((g.league?.name || "").toLowerCase().includes("nba")) quarterDuration = 12;
 
                 const remaining = quarterDuration - min;
-                if (remaining === 5 && (diff >= 30 || diff <= 2)) return true;
+                if (remaining === 5 && (diff >= 25 || diff <= 3)) return true;
               }
             }
             return false;
@@ -169,50 +169,27 @@ function getLiveBasketEvents() {
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
-
-        if (!json.response || json.response.length === 0) {
-          console.log("⏭️ No hay partidos de basket para hoy");
-          return;
-        }
-
         json.response.forEach(game => {
-          // Excluir países
           if (excludedCountries.includes(game.country?.name)) return;
 
-          saveGameRecord(game);
-
-          const home = game.teams?.home?.name || "Home";
-          const away = game.teams?.away?.name || "Away";
-          const key = `${home} vs ${away}`;
+          const home = game.teams?.home?.name;
+          const away = game.teams?.away?.name;
+          const league = game.league?.name;
+          const country = game.country?.name;
+          const status = game.status?.short;
+          const time = game.status?.timer || "";
           const pointsHome = game.scores?.home?.total || 0;
           const pointsAway = game.scores?.away?.total || 0;
-          const league = game.league?.name || "Liga desconocida";
-          const country = game.country?.name || "País desconocido";
-          const status = game.status?.short || "";
-          const time = game.status?.timer || "";
           const diff = Math.abs(pointsHome - pointsAway);
+          const key = `${home} vs ${away}`;
 
-          if (!notifiedGames.has(key)) {
-            notifiedGames.set(key, { ot: false, q4_30: false, q4_2: false, final: false, initialTotal: null });
-          }
-          const state = notifiedGames.get(key);
-
-          // --- Notificación de prórroga ---
-          if (["OT", "ET"].includes(status) && !state.ot) {
-            const totalPoints = pointsHome + pointsAway;
-            const suggestion = totalPoints + 26;
-
-            const msg = `⏱️ PRÓRROGA en ${home} vs ${away}
-Liga: ${league} | País: ${country}
-🏀 ${pointsHome} - ${pointsAway}
-📊 Total puntos: ${totalPoints}
-💡 Sugerencia: ${suggestion}`;
-            sendNotification(msg);
-
-            state.ot = true;
-            state.initialTotal = totalPoints;
-            notifiedGames.set(key, state);
-          }
+          let state = notifiedGames.get(key) || {
+            q4_2: false,
+            q4_30: false,
+            ot: false,
+            final: false,
+            initialTotal: 0
+          };
 
           // --- Último cuarto, exactamente 5 min restantes ---
           if (status === "Q4" && time) {
@@ -226,100 +203,117 @@ Liga: ${league} | País: ${country}
               const suggestion = totalPoints + 26;
 
               if (diff >= 25 && !state.q4_30) {
-                const msg = `⚡ Último cuarto (5 min restantes, diferencia ≥30)
-${home} vs ${away}
-Liga: ${league} | País: ${country}
-🏀 ${pointsHome} - ${pointsAway}
-📊 Total puntos: ${totalPoints}
-💡 Sugerencia: ${suggestion}`;
-                sendNotification(msg);
-
+                sendNotification(`⚡ Último cuarto (diferencia ≥25)\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n🏀 ${pointsHome} - ${pointsAway}\n📊 Total puntos: ${totalPoints}\n💡 Sugerencia Menos de: ${suggestion}`);
                 state.q4_30 = true;
                 state.initialTotal = totalPoints;
               } else if (diff <= 3 && !state.q4_2) {
-                const msg = `🔥 Último cuarto (5 min restantes, diferencia ≤3)
-${home} vs ${away}
-Liga: ${league} | País: ${country}
-🏀 ${pointsHome} - ${pointsAway}
-📊 Total puntos: ${totalPoints}
-💡 Sugerencia: ${suggestion}`;
-                sendNotification(msg);
-
+                sendNotification(`🔥 Último cuarto (diferencia ≤3)\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n🏀 ${pointsHome} - ${pointsAway}\n📊 Total puntos: ${totalPoints}\n💡 Sugerencia Más de: ${suggestion}`);
                 state.q4_2 = true;
                 state.initialTotal = totalPoints;
               }
               notifiedGames.set(key, state);
             }
           }
- // --- Notificación al finalizar el partido ---
+
+          // --- Prórroga detectada ---
+          if (["OT", "ET"].includes(status) && !state.ot) {
+            const totalPoints = pointsHome + pointsAway;
+            const suggestion = totalPoints + 26;
+            sendNotification(`⏱️ Prórroga detectada\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n🏀 ${pointsHome} - ${pointsAway}\n📊 Total puntos: ${totalPoints}\n💡 Sugerencia Menos de: ${suggestion}`);
+            state.ot = true;
+            state.initialTotal = totalPoints;
+            notifiedGames.set(key, state);
+          }
+
+          // --- Evaluación final del partido ---
           if (["FT", "AOT"].includes(status) && !state.final) {
             if (state.ot || state.q4_30 || state.q4_2) {
               const totalPoints = pointsHome + pointsAway;
-              let resultText = "";
-              let suggestionText = "";
+              const outcomes = [];
 
+              // 1) Partido cerrado (≤3)
               if (state.q4_2) {
-                // Partido cerrado: diferencia ≤3 → Ganaste si final > inicial + 26
-                if (totalPoints > state.initialTotal + 26) {
-                  resultText = "Ganaste";
-                  dailyStats.closed.won++;
-                  dailyStats.total.won++;
+                const initialTotal = state.initialTotal;
+                const closedLowScoring = initialTotal < 125;
+                let closedWin;
+
+                if (closedLowScoring) {
+                  closedWin = totalPoints <= initialTotal + 26;
+                  outcomes.push({
+                    label: "Cerrado (≤3, pocos puntos)",
+                    win: closedWin,
+                    suggestion: `Menos de ${initialTotal + 26} puntos`
+                  });
                 } else {
-                  resultText = "Perdiste";
-                  dailyStats.closed.lost++;
-                  dailyStats.total.lost++;
+                  closedWin = totalPoints > initialTotal + 26;
+                  outcomes.push({
+                    label: "Cerrado (≤3)",
+                    win: closedWin,
+                    suggestion: `Más de ${initialTotal + 26} puntos`
+                  });
                 }
-                suggestionText = `💡 Sugerencia: Más de ${state.initialTotal + 26} puntos`;
-              } else if (state.q4_30) {
-                // Desbalanceado: diferencia ≥25 → Ganaste si final ≤ inicial + 26
-                if (totalPoints <= state.initialTotal + 26) {
-                  resultText = "Ganaste";
-                  dailyStats.blowout.won++;
-                  dailyStats.total.won++;
+
+                if (closedWin) {
+                  dailyStats.closed.won++; dailyStats.total.won++;
                 } else {
-                  resultText = "Perdiste";
-                  dailyStats.blowout.lost++;
-                  dailyStats.total.lost++;
-                }
-                suggestionText = `💡 Sugerencia: Menos de ${state.initialTotal + 26} puntos`;
-              } else if (state.ot) {
-                // Prórroga: depende del formato
-                const isTwoHalves = (league.toLowerCase().includes("ncaa") || league.toLowerCase().includes("college"));
-                if (isTwoHalves) {
-                  // 2 tiempos: Ganaste si final > inicial + 26
-                  if (totalPoints > state.initialTotal + 26) {
-                    resultText = "Ganaste";
-                    dailyStats.overtime.won++;
-                    dailyStats.total.won++;
-                  } else {
-                    resultText = "Perdiste";
-                    dailyStats.overtime.lost++;
-                    dailyStats.total.lost++;
-                  }
-                  suggestionText = `💡 Sugerencia: Más de ${state.initialTotal + 26} puntos`;
-                } else {
-                  // 4 tiempos: Ganaste si final ≤ inicial + 26
-                  if (totalPoints <= state.initialTotal + 26) {
-                    resultText = "Ganaste";
-                    dailyStats.overtime.won++;
-                    dailyStats.total.won++;
-                  } else {
-                    resultText = "Perdiste";
-                    dailyStats.overtime.lost++;
-                    dailyStats.total.lost++;
-                  }
-                  suggestionText = `💡 Sugerencia: Menos de ${state.initialTotal + 26} puntos`;
+                  dailyStats.closed.lost++; dailyStats.total.lost++;
                 }
               }
+
+              // 2) Desbalanceado (≥25)
+              if (state.q4_30) {
+                const blowoutWin = totalPoints <= state.initialTotal + 26;
+                outcomes.push({
+                  label: "Desbalanceado (≥25)",
+                  win: blowoutWin,
+                  suggestion: `Menos de ${state.initialTotal + 26} puntos`
+                });
+                if (blowoutWin) {
+                  dailyStats.blowout.won++; dailyStats.total.won++;
+                } else {
+                  dailyStats.blowout.lost++; dailyStats.total.lost++;
+                }
+              }
+
+              // 3) Prórroga
+              if (state.ot) {
+                const isTwoHalves = (league.toLowerCase().includes("ncaa") || league.toLowerCase().includes("college"));
+                const overtimeWin = isTwoHalves
+                  ? (totalPoints > state.initialTotal + 26)
+                  : (totalPoints <= state.initialTotal + 26);
+
+                outcomes.push({
+                  label: `Prórroga (${isTwoHalves ? "2 tiempos" : "4 tiempos"})`,
+                  win: overtimeWin,
+                  suggestion: isTwoHalves
+                    ? `Más de ${state.initialTotal + 26} puntos`
+                    : `Menos de ${state.initialTotal + 26} puntos`
+                });
+
+                if (overtimeWin) {
+                  dailyStats.overtime.won++; dailyStats.total.won++;
+                } else {
+                  dailyStats.overtime.lost++; dailyStats.total.lost++;
+                }
+              }
+
+              // Resultado general
+              const overallWin = outcomes.some(o => o.win);
+              const resultText = overallWin ? "Ganaste" : "Perdiste";
+
+              const breakdown = outcomes
+                .map(o => `• ${o.label}: ${o.win ? "Ganaste" : "Perdiste"} | Sugerencia: ${o.suggestion}`)
+                .join("\n");
 
               const msg = `✅ Partido terminado: ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 Resultado final: ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
-🎯 ${resultText}
-${suggestionText}`;
+🎯 Resultado general: ${resultText}
+${breakdown}`;
               sendNotification(msg);
             }
+
             state.final = true;
             notifiedGames.delete(key);
           }
@@ -332,8 +326,7 @@ ${suggestionText}`;
 
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
-} // <-- cierre de la función getLiveBasketEvents
-
+}
 // --- Loop cada 30 segundos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket...");
