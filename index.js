@@ -14,7 +14,7 @@ let dailyGames = {};
 let currentDate = new Date().toISOString().split("T")[0];
 
 // Lista de países que no queremos incluir
-const excludedCountries = ["Kazakhstan", "Russia"];
+const excludedCountries = ["Kazakhstan", "Russia","Taiwan","Montenegro","Bosnia-and-Herzegovina"];
 
 // Estadísticas diarias (sin partidos cerrados)
 let dailyStats = {
