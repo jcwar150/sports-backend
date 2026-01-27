@@ -13,11 +13,12 @@ let notifiedGames = new Map();
 let dailyGames = {};
 let currentDate = new Date().toISOString().split("T")[0];
 
-// Lista de países que no queremos incluir
-const excludedCountries = ["Kazakhstan", "Russia","Taiwan","Montenegro","Bosnia-and-Herzegovina"];
+// Países excluidos
+const excludedCountries = ["Kazakhstan", "Russia"];
 
-// Estadísticas diarias (sin partidos cerrados)
+// Estadísticas diarias
 let dailyStats = {
+  closed: { won: 0, lost: 0 },
   overtime: { won: 0, lost: 0 },
   blowout: { won: 0, lost: 0 },
   total: { won: 0, lost: 0 }
@@ -29,6 +30,7 @@ function resetDailyGamesIfNeeded() {
     console.log("🔄 Nuevo día, reseteando registro de partidos y estadísticas");
     dailyGames = {};
     dailyStats = {
+      closed: { won: 0, lost: 0 },
       overtime: { won: 0, lost: 0 },
       blowout: { won: 0, lost: 0 },
       total: { won: 0, lost: 0 }
@@ -118,7 +120,7 @@ app.get("/live-basket", (req, res) => {
                 if ((g.league?.name || "").toLowerCase().includes("nba")) quarterDuration = 12;
 
                 const remaining = quarterDuration - min;
-                if (remaining === 5 && diff >= 25) return true;
+                if (remaining === 5 && (diff >= 25 || diff <= 2)) return true;
               }
             }
             return false;
@@ -182,25 +184,41 @@ function getLiveBasketEvents() {
           const key = `${home} vs ${away}`;
 
           let state = notifiedGames.get(key) || {
-            q4_30: false,
+            q4_closed: false,
+            q4_blowout: false,
             ot: false,
             final: false,
-            initialTotal: 0
+            initialTotal: 0,
+            pointsQ3: { home: 0, away: 0 }
           };
 
-          // --- Último cuarto, diferencia ≥25 ---
+          // --- Último cuarto, exactamente 5 min restantes ---
           if (status === "Q4" && time) {
             const [min] = time.split(":").map(Number);
             let quarterDuration = 10;
             if (league.toLowerCase().includes("nba")) quarterDuration = 12;
             const remaining = quarterDuration - min;
 
-            if (remaining === 5 && diff >= 25 && !state.q4_30) {
+            if (remaining === 5) {
               const totalPoints = pointsHome + pointsAway;
               const suggestion = totalPoints + 26;
-              sendNotification(`⚡ Último cuarto (diferencia ≥25)\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n🏀 ${pointsHome} - ${pointsAway}\n📊 Total puntos: ${totalPoints}\n💡 Sugerencia: ${suggestion}`);
-              state.q4_30 = true;
-              state.initialTotal = totalPoints;
+
+              // Cerrado (≤2 puntos de diferencia)
+              if (diff <= 2 && !state.q4_closed) {
+                sendNotification(`🔥 Partido cerrado detectado\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n🏀 ${pointsHome} - ${pointsAway}\n📊 Total puntos hasta Q3: ${totalPoints}\n💡 Sugerencia dinámica: Último cuarto ≥ promedio`);
+                state.q4_closed = true;
+                state.initialTotal = totalPoints;
+                state.pointsQ3 = { home: pointsHome, away: pointsAway };
+              }
+
+              // Desbalanceado (≥25 puntos de diferencia)
+              if (diff >= 25 && !state.q4_blowout) {
+                sendNotification(`⚡ Partido desbalanceado detectado\n${home} vs ${away}\nLiga: ${league} | País: ${country}\n🏀 ${pointsHome} - ${pointsAway}\n📊 Total puntos hasta Q3: ${totalPoints}\n💡 Sugerencia: Menos de ${suggestion}`);
+                state.q4_blowout = true;
+                state.initialTotal = totalPoints;
+                state.pointsQ3 = { home: pointsHome, away: pointsAway };
+              }
+
               notifiedGames.set(key, state);
             }
           }
@@ -217,18 +235,52 @@ function getLiveBasketEvents() {
 
           // --- Evaluación final ---
           if (["FT", "AOT"].includes(status) && !state.final) {
-            if (state.ot || state.q4_30) {
+            if (state.ot || state.q4_blowout || state.q4_closed) {
               const totalPoints = pointsHome + pointsAway;
               const outcomes = [];
 
-              // Desbalanceado
-              if (state.q4_30) {
-                const blowoutWin = totalPoints <= state.initialTotal + 26;
+              // Cerrado dinámico
+              if (state.q4_closed) {
+                const totalQ3 = state.pointsQ3.home + state.pointsQ3.away;
+                const promedioQ = totalQ3 / 3;
+                const puntosQ4 = totalPoints - totalQ3;
+                const closedWin = puntosQ4 >= promedioQ;
+
                 outcomes.push({
-                  label: "Desbalanceado (≥25)",
-                  win: blowoutWin,
-                  suggestion: `Menos de ${state.initialTotal + 26} puntos`
+                  label: "Cerrado (dinámico)",
+                  win: closedWin,
+                  suggestion: `Último cuarto ≥ ${promedioQ.toFixed(1)} puntos`
                 });
+
+                if (closedWin) {
+                  dailyStats.closed.won++; dailyStats.total.won++;
+                } else {
+                  dailyStats.closed.lost++; dailyStats.total.lost++;
+                }
+              }
+
+              // Desbalanceado con intensidad
+              if (state.q4_blowout) {
+                const puntosGanadorQ3 = Math.max(state.pointsQ3.home, state.pointsQ3.away);
+                const promedioGanador = puntosGanadorQ3 / 3;
+                const puntosGanadorFinal = Math.max(pointsHome, pointsAway);
+                const puntosGanadorQ4 = puntosGanadorFinal - puntosGanadorQ3;
+
+                let intensidad = "baja";
+                if (puntosGanadorQ4 >= promedioGanador * 0.8) intensidad = "alta";
+
+                const blowoutWin = intensidad === "baja"
+                  ? (totalPoints <= state.initialTotal + 26)
+                  : (totalPoints > state.initialTotal + 26);
+
+                outcomes.push({
+                  label: `Desbalanceado (${intensidad} intensidad)`,
+                  win: blowoutWin,
+                  suggestion: intensidad === "baja"
+                    ? `Menos de ${state.initialTotal + 26} puntos`
+                    : `Más de ${state.initialTotal + 26} puntos`
+                });
+
                 if (blowoutWin) {
                   dailyStats.blowout.won++; dailyStats.total.won++;
                 } else {
@@ -302,6 +354,7 @@ function sendDailySummary() {
   };
 
   const msg = `📊 Resumen del día (${currentDate})
+- Partido cerrado: Ganados ${dailyStats.closed.won}, Perdidos ${dailyStats.closed.lost}, %Ganados ${calcPercent(dailyStats.closed.won, dailyStats.closed.lost)}
 - Prórroga: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
 - Desbalanceados: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
 - General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
@@ -310,6 +363,7 @@ function sendDailySummary() {
 
   // Reset stats para el nuevo día
   dailyStats = {
+    closed: { won: 0, lost: 0 },
     overtime: { won: 0, lost: 0 },
     blowout: { won: 0, lost: 0 },
     total: { won: 0, lost: 0 }
