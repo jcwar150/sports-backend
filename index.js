@@ -173,14 +173,15 @@ function getLiveBasketEvents() {
 
           let state = notifiedGames.get(key) || {
             q3_closed: false,
+            q4_blowout: false,
             ot: false,
             final: false,
             initialTotal: 0,
             pointsQ3: { home: 0, away: 0 }
           };
 
-          // --- Cerrado: notificación al terminar Q3 ---
-          if (status === "Q3" && diff <= 2 && !state.q3_closed) {
+          // --- Cerrado: notificación al entrar en Q4 ---
+          if (status === "Q4" && diff <= 2 && !state.q3_closed) {
             const totalPoints = pointsHome + pointsAway;
             const promedioQ = totalPoints / 3;
             const sugerencia = totalPoints + promedioQ;
@@ -194,6 +195,28 @@ Liga: ${league} | País: ${country}
 👉 Sugerencia: Más de ${sugerencia.toFixed(0)} puntos`);
 
             state.q3_closed = true;
+            state.initialTotal = totalPoints;
+            state.pointsQ3 = { home: pointsHome, away: pointsAway };
+            notifiedGames.set(key, state);
+          }
+
+          // --- Desbalanceado: notificación al entrar en Q4 ---
+          if (status === "Q4" && diff >= 20 && !state.q4_blowout) {
+            const totalPoints = pointsHome + pointsAway;
+            const promedioA = pointsHome / 3;
+            const promedioB = pointsAway / 3;
+            const promedioTotal = promedioA + promedioB;
+            const sugerencia = totalPoints + promedioTotal;
+
+            sendNotification(`⚡ Partido desbalanceado detectado
+${home} vs ${away}
+Liga: ${league} | País: ${country}
+🏀 ${pointsHome} - ${pointsAway}
+📊 Total puntos hasta Q3: ${totalPoints}
+💡 Promedio A: ${promedioA.toFixed(1)} | Promedio B: ${promedioB.toFixed(1)}
+👉 Sugerencia: Menos de ${sugerencia.toFixed(0)} puntos`);
+
+            state.q4_blowout = true;
             state.initialTotal = totalPoints;
             state.pointsQ3 = { home: pointsHome, away: pointsAway };
             notifiedGames.set(key, state);
@@ -218,7 +241,7 @@ Liga: ${league} | País: ${country}
 
           // --- Evaluación final ---
           if (["FT", "AOT"].includes(status) && !state.final) {
-            if (state.q3_closed || state.ot) {
+            if (state.q3_closed || state.q4_blowout || state.ot) {
               const totalPoints = pointsHome + pointsAway;
               const outcomes = [];
 
@@ -239,6 +262,28 @@ Liga: ${league} | País: ${country}
                   dailyStats.closed.won++; dailyStats.total.won++;
                 } else {
                   dailyStats.closed.lost++; dailyStats.total.lost++;
+                }
+              }
+
+              // Desbalanceado dinámico
+              if (state.q4_blowout) {
+                const totalQ3 = state.pointsQ3.home + state.pointsQ3.away;
+                const promedioA = state.pointsQ3.home / 3;
+                const promedioB = state.pointsQ3.away / 3;
+                const promedioTotal = promedioA + promedioB;
+                const puntosQ4 = totalPoints - totalQ3;
+                const blowoutWin = puntosQ4 <= promedioTotal;
+
+                outcomes.push({
+                  label: "Desbalanceado (dinámico)",
+                  win: blowoutWin,
+                  suggestion: `Último cuarto ≤ ${promedioTotal.toFixed(1)} puntos`
+                });
+
+                if (blowoutWin) {
+                  dailyStats.blowout.won++; dailyStats.total.won++;
+                } else {
+                  dailyStats.blowout.lost++; dailyStats.total.lost++;
                 }
               }
 
