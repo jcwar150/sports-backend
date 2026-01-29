@@ -75,7 +75,6 @@ async function sendNotification(message) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
-
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
   const today = new Date().toISOString().split("T")[0];
@@ -156,7 +155,7 @@ Liga: ${league} | País: ${country}
           }
 
           // --- Prórroga: notificación al entrar en vivo ---
-          if ((status.includes("OT") || status.includes("ET")) && !state.ot && !state.final) {
+          if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
             const totalPoints = pointsHome + pointsAway;
             const suggestion = totalPoints + 26;
 
@@ -167,13 +166,13 @@ Liga: ${league} | País: ${country}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
-            state.ot = true;                 // marcar que ya se notificó la prórroga
+            state.ot = true;                 // candado: ya se notificó la prórroga
             state.initialTotal = totalPoints;
-            notifiedGames.set(key, state);
+            notifiedGames.set(key, state);   // mantener hasta FT/AOT
           }
 
           // --- Evaluación final ---
-          if (["FT", "AOT"].includes(status) && !state.final) {
+          if ((status === "FT" || status === "AOT") && !state.final) {
             if (state.q3_closed || state.q4_blowout || state.ot) {
               const totalPoints = pointsHome + pointsAway;
               const outcomes = [];
