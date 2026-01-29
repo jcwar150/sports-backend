@@ -223,8 +223,8 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);
           }
 
-          // --- Prórroga: siempre MENOS de ---
-          if ((status.includes("OT") || status.includes("ET")) && !state.ot) {
+          // --- Prórroga: siempre MENOS de (versión original) ---
+          if (["OT", "ET"].includes(status) && !state.ot) {
             const totalPoints = pointsHome + pointsAway;
             const suggestion = totalPoints + 26;
 
@@ -322,8 +322,8 @@ ${breakdown}`);
 
             // 🔒 Candado final para evitar repeticiones
             state.final = true;              
-            notifiedGames.set(key, state);   // guardar estado final
-            notifiedGames.delete(key);       // borrar del Map
+            notifiedGames.set(key, state);   
+            notifiedGames.delete(key);       
           }
         });
       } catch (err) {
@@ -335,7 +335,6 @@ ${breakdown}`);
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-
 // --- Loop cada 30 segundos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket...");
