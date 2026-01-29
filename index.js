@@ -320,8 +320,10 @@ Liga: ${league} | País: ${country}
 ${breakdown}`);
             }
 
-            state.final = true;
-            notifiedGames.delete(key);
+            // 🔒 Candado final para evitar repeticiones
+            state.final = true;              
+            notifiedGames.set(key, state);   // guardar estado final
+            notifiedGames.delete(key);       // borrar del Map
           }
         });
       } catch (err) {
@@ -333,6 +335,7 @@ ${breakdown}`);
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
+
 // --- Loop cada 30 segundos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket...");
