@@ -336,7 +336,7 @@ ${breakdown}`);
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket...");
   getLiveBasketEvents();
-}, 30 * 1000);
+}, 15 * 1000);
 
 // --- Resumen diario a las 23:59 ---
 function sendDailySummary() {
