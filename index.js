@@ -76,74 +76,6 @@ async function sendNotification(message) {
   }
 }
 
-app.get("/live-basket", (req, res) => {
-  resetDailyGamesIfNeeded();
-  const today = new Date().toISOString().split("T")[0];
-  const options = {
-    method: "GET",
-    hostname: "v1.basketball.api-sports.io",
-    path: `/games?date=${today}&timezone=Europe/London`,
-    headers: { "x-apisports-key": API_SPORT_KEY }
-  };
-
-  const reqApi = https.request(options, apiRes => {
-    let data = "";
-    apiRes.on("data", chunk => (data += chunk));
-    apiRes.on("end", () => {
-      try {
-        const json = JSON.parse(data);
-        const games = json.response
-          .filter(g => {
-            if (excludedCountries.includes(g.country?.name)) return false;
-
-            const status = g.status?.short;
-            const pointsHome = g.scores?.home?.total || 0;
-            const pointsAway = g.scores?.away?.total || 0;
-            const diff = Math.abs(pointsHome - pointsAway);
-
-            if (["OT", "ET"].includes(status)) return true;
-
-            if (status === "Q4") {
-              const time = g.status?.timer || "";
-              if (time) {
-                const [min] = time.split(":").map(Number);
-                let quarterDuration = 10;
-                if ((g.league?.name || "").toLowerCase().includes("nba")) quarterDuration = 12;
-
-                const remaining = quarterDuration - min;
-                if (remaining === 5 && (diff >= 25 || diff <= 2)) return true;
-              }
-            }
-            return false;
-          })
-          .map(game => {
-            saveGameRecord(game);
-            return {
-              home: game.teams?.home?.name,
-              away: game.teams?.away?.name,
-              pointsHome: game.scores?.home?.total,
-              pointsAway: game.scores?.away?.total,
-              league: game.league?.name,
-              country: game.country?.name,
-              status: game.status?.short,
-              time: game.status?.timer || null
-            };
-          });
-        res.json({ games });
-      } catch (err) {
-        res.status(500).json({ error: "Error parseando respuesta" });
-      }
-    });
-  });
-
-  reqApi.on("error", err => res.status(500).json({ error: err.message }));
-  reqApi.end();
-});
-
-app.get("/daily-record", (req, res) => {
-  resetDailyGamesIfNeeded();
-  res.json({ date: currentDate, games: dailyGames, stats: dailyStats });
-});
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
   const today = new Date().toISOString().split("T")[0];
@@ -223,8 +155,8 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);
           }
 
-          // --- Prórroga: siempre MENOS de (versión original) ---
-          if (["OT", "ET"].includes(status) && !state.ot) {
+          // --- Prórroga: notificación al entrar en vivo ---
+          if ((status.includes("OT") || status.includes("ET")) && !state.ot && !state.final) {
             const totalPoints = pointsHome + pointsAway;
             const suggestion = totalPoints + 26;
 
@@ -235,7 +167,7 @@ Liga: ${league} | País: ${country}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
-            state.ot = true;
+            state.ot = true;                 // marcar que ya se notificó la prórroga
             state.initialTotal = totalPoints;
             notifiedGames.set(key, state);
           }
@@ -288,7 +220,7 @@ Liga: ${league} | País: ${country}
                 }
               }
 
-              // Prórroga (siempre MENOS de)
+              // Prórroga (evaluar al final, siempre MENOS de)
               if (state.ot) {
                 const overtimeWin = totalPoints <= state.initialTotal + 26;
 
@@ -321,9 +253,9 @@ ${breakdown}`);
             }
 
             // 🔒 Candado final para evitar repeticiones
-            state.final = true;              
-            notifiedGames.set(key, state);   
-            notifiedGames.delete(key);       
+            state.final = true;
+            notifiedGames.set(key, state);
+            notifiedGames.delete(key);
           }
         });
       } catch (err) {
