@@ -111,9 +111,15 @@ function getLiveBasketEvents() {
             initialTotal: 0,
             pointsQ3: { home: 0, away: 0 }
           };
+// Función auxiliar: detecta si estamos en el último minuto del Q3
+function isLastMinute(timer) {
+  // timer viene como "MM:SS"
+  const [min] = timer.split(":").map(Number);
+  return min === 1 || min === 0; // último minuto sin importar segundos
+}
 
-         // --- Cerrado: notificación en el último minuto del Q3 ---
-if (status === "Q3" && (timer.startsWith("01") || timer.startsWith("00")) && diff <= 2 && !state.q3_closed) {
+// --- Cerrado: notificación en el último minuto del Q3 ---
+if (status === "Q3" && isLastMinute(timer) && diff <= 2 && !state.q3_closed) {
   const totalPoints = pointsHome + pointsAway;
   const promedioQ = totalPoints / 3;
   const sugerencia = totalPoints + promedioQ;
@@ -133,7 +139,7 @@ Liga: ${league} | País: ${country}
 }
 
 // --- Desbalanceado: notificación en el último minuto del Q3 ---
-if (status === "Q3" && (timer.startsWith("01") || timer.startsWith("00")) && diff >= 20 && !state.q4_blowout) {
+if (status === "Q3" && isLastMinute(timer) && diff >= 20 && !state.q4_blowout) {
   const totalPoints = pointsHome + pointsAway;
   const promedioA = pointsHome / 3;
   const promedioB = pointsAway / 3;
@@ -153,6 +159,7 @@ Liga: ${league} | País: ${country}
   state.pointsQ3 = { home: pointsHome, away: pointsAway };
   notifiedGames.set(key, state);
 }
+
           // --- Prórroga: notificación al entrar en vivo ---
           if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
             const totalPoints = pointsHome + pointsAway;
