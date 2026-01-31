@@ -111,11 +111,20 @@ function getLiveBasketEvents() {
             initialTotal: 0,
             pointsQ3: { home: 0, away: 0 }
           };
-// Función auxiliar: último minuto del Q3 (tiempo restante)
+// Función auxiliar: calcula si estamos en el último minuto del Q3
 function isLastMinuteQ3(status, timer) {
   if (status !== "Q3") return false;
-  const [min] = timer.split(":").map(Number);
-  return min === 1 || min === 0; // último minuto restante
+
+  const [min, sec] = timer.split(":").map(Number);
+  const elapsedSeconds = (min * 60) + sec;
+
+  // Detectar duración del cuarto: si ya pasaron más de 600 seg → es de 12 min
+  const quarterDuration = elapsedSeconds > 600 ? 720 : 600;
+
+  const remainingSeconds = quarterDuration - elapsedSeconds;
+
+  // Último minuto → menos de 60 segundos restantes
+  return remainingSeconds <= 60;
 }
 
 // --- Cerrado: notificación en el último minuto del Q3 ---
@@ -159,6 +168,7 @@ Liga: ${league} | País: ${country}
   state.pointsQ3 = { home: pointsHome, away: pointsAway };
   notifiedGames.set(key, state);
 }
+
 
           // --- Prórroga: notificación al entrar en vivo ---
           if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
