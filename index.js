@@ -111,15 +111,15 @@ function getLiveBasketEvents() {
             initialTotal: 0,
             pointsQ3: { home: 0, away: 0 }
           };
-// Función auxiliar: detecta si estamos en el último minuto del Q3
-function isLastMinute(timer) {
-  // timer viene como "MM:SS"
+// Función auxiliar: último minuto del Q3 (tiempo restante)
+function isLastMinuteQ3(status, timer) {
+  if (status !== "Q3") return false;
   const [min] = timer.split(":").map(Number);
-  return min === 1 || min === 0; // último minuto sin importar segundos
+  return min === 1 || min === 0; // último minuto restante
 }
 
 // --- Cerrado: notificación en el último minuto del Q3 ---
-if (status === "Q3" && isLastMinute(timer) && diff <= 2 && !state.q3_closed) {
+if (isLastMinuteQ3(status, timer) && diff <= 2 && !state.q3_closed) {
   const totalPoints = pointsHome + pointsAway;
   const promedioQ = totalPoints / 3;
   const sugerencia = totalPoints + promedioQ;
@@ -139,7 +139,7 @@ Liga: ${league} | País: ${country}
 }
 
 // --- Desbalanceado: notificación en el último minuto del Q3 ---
-if (status === "Q3" && isLastMinute(timer) && diff >= 20 && !state.q4_blowout) {
+if (isLastMinuteQ3(status, timer) && diff >= 20 && !state.q4_blowout) {
   const totalPoints = pointsHome + pointsAway;
   const promedioA = pointsHome / 3;
   const promedioB = pointsAway / 3;
