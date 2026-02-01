@@ -111,20 +111,18 @@ function getLiveBasketEvents() {
             initialTotal: 0,
             pointsQ3: { home: 0, away: 0 }
           };
-// Función auxiliar: calcula si estamos en el último minuto del Q3
+// Función auxiliar: detecta último minuto del Q3 usando tiempo transcurrido
 function isLastMinuteQ3(status, timer) {
   if (status !== "Q3") return false;
 
   const [min, sec] = timer.split(":").map(Number);
   const elapsedSeconds = (min * 60) + sec;
 
-  // Detectar duración del cuarto: si ya pasaron más de 600 seg → es de 12 min
+  // Duración del cuarto: si ya pasaron más de 600 seg → es de 12 min
   const quarterDuration = elapsedSeconds > 600 ? 720 : 600;
 
-  const remainingSeconds = quarterDuration - elapsedSeconds;
-
-  // Último minuto → menos de 60 segundos restantes
-  return remainingSeconds <= 60;
+  // Último minuto → cuando ya se jugaron (duración - 60) segundos
+  return elapsedSeconds >= (quarterDuration - 60);
 }
 
 // --- Cerrado: notificación en el último minuto del Q3 ---
@@ -135,8 +133,8 @@ if (isLastMinuteQ3(status, timer) && diff <= 2 && !state.q3_closed) {
 
   sendNotification(`🔥 Partido cerrado detectado en el último minuto del Q3
 ${home} vs ${away}
-Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
+⏱️ Tiempo transcurrido: ${timer} | Restante: ${(quarterDuration*60 - elapsedSeconds)/60 | 0}:${((quarterDuration*60 - elapsedSeconds)%60).toString().padStart(2,"0")}
 📊 Total puntos hasta Q3: ${totalPoints}
 💡 Promedio dinámico: ${promedioQ.toFixed(1)} puntos por cuarto
 👉 Sugerencia: Más de ${sugerencia.toFixed(0)} puntos`);
@@ -157,8 +155,8 @@ if (isLastMinuteQ3(status, timer) && diff >= 20 && !state.q4_blowout) {
 
   sendNotification(`⚡ Partido desbalanceado detectado en el último minuto del Q3
 ${home} vs ${away}
-Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
+⏱️ Tiempo transcurrido: ${timer} | Restante: ${(quarterDuration*60 - elapsedSeconds)/60 | 0}:${((quarterDuration*60 - elapsedSeconds)%60).toString().padStart(2,"0")}
 📊 Total puntos hasta Q3: ${totalPoints}
 💡 Promedio A: ${promedioA.toFixed(1)} | Promedio B: ${promedioB.toFixed(1)}
 👉 Sugerencia: Menos de ${sugerencia.toFixed(0)} puntos`);
@@ -169,7 +167,27 @@ Liga: ${league} | País: ${country}
   notifiedGames.set(key, state);
 }
 
+// --- Todos los partidos en curso: mostrar cálculo ---
+if (["Q1","Q2","Q3","Q4"].includes(status)) {
+  const totalPoints = pointsHome + pointsAway;
+  const promedioQ = totalPoints / (status === "Q1" ? 1 : status === "Q2" ? 2 : status === "Q3" ? 3 : 4);
 
+  // Detectar duración del cuarto
+  const [min, sec] = timer.split(":").map(Number);
+  const elapsedSeconds = (min * 60) + sec;
+  const quarterDuration = elapsedSeconds > 600 ? 720 : 600;
+  const remainingSeconds = quarterDuration - elapsedSeconds;
+  const remainingMin = Math.floor(remainingSeconds / 60);
+  const remainingSec = remainingSeconds % 60;
+
+  sendNotification(`📡 Partido en curso
+${home} vs ${away}
+🏀 ${pointsHome} - ${pointsAway}
+⏱️ Tiempo transcurrido: ${timer} | Restante: ${remainingMin}:${remainingSec.toString().padStart(2,"0")}
+📊 Total puntos: ${totalPoints}
+💡 Promedio por cuarto: ${promedioQ.toFixed(1)}
+👉 Sugerencia: Podría terminar con ~${(promedioQ*4).toFixed(0)} puntos`);
+}
           // --- Prórroga: notificación al entrar en vivo ---
           if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
             const totalPoints = pointsHome + pointsAway;
