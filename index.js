@@ -121,8 +121,8 @@ function isOneMinuteQ4(status, timer) {
 // --- Cerrado: notificación al minuto 1 del Q4 ---
 if (isOneMinuteQ4(status, timer) && diff <= 2 && !state.q4_closed) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioQ = totalPoints / 3; // ✅ promedio hasta Q3
-  const sugerencia = totalPoints + promedioQ;
+  const promedioGeneral = totalPoints / 3; // ✅ promedio general hasta Q3
+  const estimadoFinal = totalPoints + promedioGeneral;
 
   sendNotification(`🔥 Partido cerrado detectado al minuto 1 del Q4
 ${home} vs ${away}
@@ -130,22 +130,21 @@ Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 ⏱️ Tiempo transcurrido: ${timer}
 📊 Total puntos hasta Q3: ${totalPoints}
-💡 Promedio dinámico: ${promedioQ.toFixed(1)} puntos por cuarto
-👉 Sugerencia: Más de ${sugerencia.toFixed(0)} puntos`);
+💡 Promedio general: ${promedioGeneral.toFixed(1)} puntos por cuarto
+👉 Estimado final: ${estimadoFinal.toFixed(0)} puntos`);
 
   state.q4_closed = true;
   state.initialTotal = totalPoints;
-  state.pointsQ4 = { home: pointsHome, away: pointsAway };
+  state.promedioGeneral = promedioGeneral;
+  state.estimadoFinal = estimadoFinal;
   notifiedGames.set(key, state);
 }
 
 // --- Desbalanceado: notificación al minuto 1 del Q4 ---
 if (isOneMinuteQ4(status, timer) && diff >= 20 && !state.q4_blowout) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioA = pointsHome / 3; // ✅ promedio hasta Q3
-  const promedioB = pointsAway / 3; // ✅ promedio hasta Q3
-  const promedioTotal = promedioA + promedioB;
-  const sugerencia = totalPoints + promedioTotal;
+  const promedioGeneral = totalPoints / 3; // ✅ promedio general hasta Q3
+  const estimadoFinal = totalPoints + promedioGeneral;
 
   sendNotification(`⚡ Partido desbalanceado detectado al minuto 1 del Q4
 ${home} vs ${away}
@@ -153,14 +152,16 @@ Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 ⏱️ Tiempo transcurrido: ${timer}
 📊 Total puntos hasta Q3: ${totalPoints}
-💡 Promedio A: ${promedioA.toFixed(1)} | Promedio B: ${promedioB.toFixed(1)}
-👉 Sugerencia: Menos de ${sugerencia.toFixed(0)} puntos`);
+💡 Promedio general: ${promedioGeneral.toFixed(1)} puntos por cuarto
+👉 Estimado final: ${estimadoFinal.toFixed(0)} puntos`);
 
   state.q4_blowout = true;
   state.initialTotal = totalPoints;
-  state.pointsQ4 = { home: pointsHome, away: pointsAway };
+  state.promedioGeneral = promedioGeneral;
+  state.estimadoFinal = estimadoFinal;
   notifiedGames.set(key, state);
 }
+
 
           // --- Prórroga: notificación al entrar en vivo ---
           if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
@@ -179,91 +180,86 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);   // mantener hasta FT/AOT
           }
 
-          // --- Evaluación final ---
-          if ((status === "FT" || status === "AOT") && !state.final) {
-            if (state.q3_closed || state.q4_blowout || state.ot) {
-              const totalPoints = pointsHome + pointsAway;
-              const outcomes = [];
+      // --- Evaluación final ---
+if ((status === "FT" || status === "AOT") && !state.final) {
+  if (state.q4_closed || state.q4_blowout || state.ot) {
+    const totalPoints = pointsHome + pointsAway;
+    const outcomes = [];
 
-              // Cerrado dinámico
-              if (state.q3_closed) {
-                const totalQ3 = state.pointsQ3.home + state.pointsQ3.away;
-                const promedioQ = totalQ3 / 3;
-                const puntosQ4 = totalPoints - totalQ3;
-                const closedWin = puntosQ4 >= promedioQ;
+    // Cerrado con promedio general
+    if (state.q4_closed) {
+      const estimadoFinal = state.estimadoFinal || 0;
+      const closedWin = totalPoints >= estimadoFinal;
 
-                outcomes.push({
-                  label: "Cerrado (dinámico)",
-                  win: closedWin,
-                  suggestion: `Último cuarto ≥ ${promedioQ.toFixed(1)} puntos`
-                });
+      outcomes.push({
+        label: "Cerrado (promedio general)",
+        win: closedWin,
+        suggestion: `Total final ≥ ${estimadoFinal.toFixed(0)} puntos`
+      });
 
-                if (closedWin) {
-                  dailyStats.closed.won++; dailyStats.total.won++;
-                } else {
-                  dailyStats.closed.lost++; dailyStats.total.lost++;
-                }
-              }
+      if (closedWin) {
+        dailyStats.closed.won++; dailyStats.total.won++;
+      } else {
+        dailyStats.closed.lost++; dailyStats.total.lost++;
+      }
+    }
 
-              // Desbalanceado dinámico
-              if (state.q4_blowout) {
-                const totalQ3 = state.pointsQ3.home + state.pointsQ3.away;
-                const promedioA = state.pointsQ3.home / 3;
-                const promedioB = state.pointsQ3.away / 3;
-                const promedioTotal = promedioA + promedioB;
-                const puntosQ4 = totalPoints - totalQ3;
-                const blowoutWin = puntosQ4 <= promedioTotal;
+    // Desbalanceado con promedio general
+    if (state.q4_blowout) {
+      const estimadoFinal = state.estimadoFinal || 0;
+      const blowoutWin = totalPoints <= estimadoFinal;
 
-                outcomes.push({
-                  label: "Desbalanceado (dinámico)",
-                  win: blowoutWin,
-                  suggestion: `Último cuarto ≤ ${promedioTotal.toFixed(1)} puntos`
-                });
+      outcomes.push({
+        label: "Desbalanceado (promedio general)",
+        win: blowoutWin,
+        suggestion: `Total final ≤ ${estimadoFinal.toFixed(0)} puntos`
+      });
 
-                if (blowoutWin) {
-                  dailyStats.blowout.won++; dailyStats.total.won++;
-                } else {
-                  dailyStats.blowout.lost++; dailyStats.total.lost++;
-                }
-              }
+      if (blowoutWin) {
+        dailyStats.blowout.won++; dailyStats.total.won++;
+      } else {
+        dailyStats.blowout.lost++; dailyStats.total.lost++;
+      }
+    }
 
-              // Prórroga (evaluar al final, siempre MENOS de)
-              if (state.ot) {
-                const overtimeWin = totalPoints <= state.initialTotal + 26;
+    // Prórroga (evaluar al final, siempre MENOS de)
+    if (state.ot) {
+      const overtimeWin = totalPoints <= state.initialTotal + 26;
 
-                outcomes.push({
-                  label: "Prórroga (todas)",
-                  win: overtimeWin,
-                  suggestion: `Menos de ${state.initialTotal + 26} puntos`
-                });
+      outcomes.push({
+        label: "Prórroga (todas)",
+        win: overtimeWin,
+        suggestion: `Menos de ${state.initialTotal + 26} puntos`
+      });
 
-                if (overtimeWin) {
-                  dailyStats.overtime.won++; dailyStats.total.won++;
-                } else {
-                  dailyStats.overtime.lost++; dailyStats.total.lost++;
-                }
-              }
+      if (overtimeWin) {
+        dailyStats.overtime.won++; dailyStats.total.won++;
+      } else {
+        dailyStats.overtime.lost++; dailyStats.total.lost++;
+      }
+    }
 
-              const overallWin = outcomes.some(o => o.win);
-              const resultText = overallWin ? "Ganaste" : "Perdiste";
+    const overallWin = outcomes.some(o => o.win);
+    const resultText = overallWin ? "Ganaste" : "Perdiste";
 
-              const breakdown = outcomes
-                .map(o => `• ${o.label}: ${o.win ? "Ganaste" : "Perdiste"} | Sugerencia: ${o.suggestion}`)
-                .join("\n");
+    const breakdown = outcomes
+      .map(o => `• ${o.label}: ${o.win ? "Ganaste" : "Perdiste"} | Sugerencia: ${o.suggestion}`)
+      .join("\n");
 
-              sendNotification(`✅ Partido terminado: ${home} vs ${away}
+    sendNotification(`✅ Partido terminado: ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 Resultado final: ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
 🎯 Resultado general: ${resultText}
 ${breakdown}`);
-            }
+  }
 
-            // 🔒 Candado final para evitar repeticiones
-            state.final = true;
-            notifiedGames.set(key, state);
-            notifiedGames.delete(key);
-          }
+  // 🔒 Candado final para evitar repeticiones
+  state.final = true;
+  notifiedGames.set(key, state);
+  notifiedGames.delete(key);
+}
+
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -274,7 +270,7 @@ ${breakdown}`);
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-// --- Loop cada 30 segundos ---
+// --- Loop cada 15 segundos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos de basket...");
   getLiveBasketEvents();
@@ -311,3 +307,4 @@ setInterval(() => {
     sendDailySummary();
   }
 }, 60 * 1000);
+
