@@ -111,61 +111,55 @@ function getLiveBasketEvents() {
             initialTotal: 0,
             pointsQ3: { home: 0, away: 0 }
           };
-// Función auxiliar: detecta último minuto del Q3 usando tiempo transcurrido
-function isLastMinuteQ3(status, timer) {
-  if (status !== "Q3") return false;
-
-  const [min, sec] = timer.split(":").map(Number);
-  const elapsedSeconds = (min * 60) + sec;
-
-  // Duración del cuarto: si transcurrido > 600 → es de 12 min, si no → 10 min
-  const quarterDuration = elapsedSeconds > 600 ? 720 : 600;
-
-  // Último minuto → cuando ya se jugaron (duración - 60) segundos
-  return elapsedSeconds >= (quarterDuration - 60);
+// Función auxiliar: detecta si estamos en el minuto 1 del último cuarto (Q4)
+function isFirstMinuteQ4(status, timer) {
+  if (status !== "Q4") return false;
+  const [min] = timer.split(":").map(Number);
+  return min === 1; // exactamente minuto 1 transcurrido
 }
 
-// --- Cerrado: notificación en el último minuto del Q3 ---
-if (isLastMinuteQ3(status, timer) && diff <= 2 && !state.q3_closed) {
+// --- Cerrado: notificación al minuto 1 del Q4 ---
+if (isFirstMinuteQ4(status, timer) && diff <= 2 && !state.q4_closed) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioQ = totalPoints / 3;
+  const promedioQ = totalPoints / 4;
   const sugerencia = totalPoints + promedioQ;
 
-  sendNotification(`🔥 Partido cerrado detectado en el último minuto del Q3
+  sendNotification(`🔥 Partido cerrado detectado al minuto 1 del Q4
 ${home} vs ${away}
 🏀 ${pointsHome} - ${pointsAway}
 ⏱️ Tiempo transcurrido: ${timer}
-📊 Total puntos hasta Q3: ${totalPoints}
+📊 Total puntos hasta ahora: ${totalPoints}
 💡 Promedio dinámico: ${promedioQ.toFixed(1)} puntos por cuarto
 👉 Sugerencia: Más de ${sugerencia.toFixed(0)} puntos`);
 
-  state.q3_closed = true;
+  state.q4_closed = true;
   state.initialTotal = totalPoints;
-  state.pointsQ3 = { home: pointsHome, away: pointsAway };
+  state.pointsQ4 = { home: pointsHome, away: pointsAway };
   notifiedGames.set(key, state);
 }
 
-// --- Desbalanceado: notificación en el último minuto del Q3 ---
-if (isLastMinuteQ3(status, timer) && diff >= 20 && !state.q4_blowout) {
+// --- Desbalanceado: notificación al minuto 1 del Q4 ---
+if (isFirstMinuteQ4(status, timer) && diff >= 20 && !state.q4_blowout) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioA = pointsHome / 3;
-  const promedioB = pointsAway / 3;
+  const promedioA = pointsHome / 4;
+  const promedioB = pointsAway / 4;
   const promedioTotal = promedioA + promedioB;
   const sugerencia = totalPoints + promedioTotal;
 
-  sendNotification(`⚡ Partido desbalanceado detectado en el último minuto del Q3
+  sendNotification(`⚡ Partido desbalanceado detectado al minuto 1 del Q4
 ${home} vs ${away}
 🏀 ${pointsHome} - ${pointsAway}
 ⏱️ Tiempo transcurrido: ${timer}
-📊 Total puntos hasta Q3: ${totalPoints}
+📊 Total puntos hasta ahora: ${totalPoints}
 💡 Promedio A: ${promedioA.toFixed(1)} | Promedio B: ${promedioB.toFixed(1)}
 👉 Sugerencia: Menos de ${sugerencia.toFixed(0)} puntos`);
 
   state.q4_blowout = true;
   state.initialTotal = totalPoints;
-  state.pointsQ3 = { home: pointsHome, away: pointsAway };
+  state.pointsQ4 = { home: pointsHome, away: pointsAway };
   notifiedGames.set(key, state);
 }
+
 
           // --- Prórroga: notificación al entrar en vivo ---
           if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
