@@ -111,20 +111,20 @@ function getLiveBasketEvents() {
             initialTotal: 0,
             pointsQ3: { home: 0, away: 0 }
           };
-// Función auxiliar: detecta si estamos en el inicio del último cuarto (Q4)
-function isStartQ4(status, timer) {
+// Función auxiliar: detecta si estamos en el minuto 1 del último cuarto (Q4)
+function isOneMinuteQ4(status, timer) {
   if (status !== "Q4") return false;
-  const [min, sec] = timer.split(":").map(Number);
-  return min === 0 && sec === 0; // exactamente transcurrido 0:00
+  const [min] = timer.split(":").map(Number);
+  return min === 1; // exactamente minuto 1 transcurrido
 }
 
-// --- Cerrado: notificación al inicio del Q4 ---
-if (isStartQ4(status, timer) && diff <= 2 && !state.q4_closed) {
+// --- Cerrado: notificación al minuto 1 del Q4 ---
+if (isOneMinuteQ4(status, timer) && diff <= 2 && !state.q4_closed) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioQ = totalPoints / 3; // ✅ corregido: promedio hasta Q3
+  const promedioQ = totalPoints / 3; // ✅ promedio hasta Q3
   const sugerencia = totalPoints + promedioQ;
 
-  sendNotification(`🔥 Partido cerrado detectado al inicio del Q4
+  sendNotification(`🔥 Partido cerrado detectado al minuto 1 del Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -139,15 +139,15 @@ Liga: ${league} | País: ${country}
   notifiedGames.set(key, state);
 }
 
-// --- Desbalanceado: notificación al inicio del Q4 ---
-if (isStartQ4(status, timer) && diff >= 20 && !state.q4_blowout) {
+// --- Desbalanceado: notificación al minuto 1 del Q4 ---
+if (isOneMinuteQ4(status, timer) && diff >= 20 && !state.q4_blowout) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioA = pointsHome / 3; // ✅ corregido: promedio hasta Q3
-  const promedioB = pointsAway / 3; // ✅ corregido: promedio hasta Q3
+  const promedioA = pointsHome / 3; // ✅ promedio hasta Q3
+  const promedioB = pointsAway / 3; // ✅ promedio hasta Q3
   const promedioTotal = promedioA + promedioB;
   const sugerencia = totalPoints + promedioTotal;
 
-  sendNotification(`⚡ Partido desbalanceado detectado al inicio del Q4
+  sendNotification(`⚡ Partido desbalanceado detectado al minuto 1 del Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -161,6 +161,7 @@ Liga: ${league} | País: ${country}
   state.pointsQ4 = { home: pointsHome, away: pointsAway };
   notifiedGames.set(key, state);
 }
+
           // --- Prórroga: notificación al entrar en vivo ---
           if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
             const totalPoints = pointsHome + pointsAway;
