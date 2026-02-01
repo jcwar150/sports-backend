@@ -180,7 +180,7 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);   // mantener hasta FT/AOT
           }
 
-      // --- Evaluación final ---
+    // --- Evaluación final ---
 if ((status === "FT" || status === "AOT") && !state.final) {
   if (state.q4_closed || state.q4_blowout || state.ot) {
     const totalPoints = pointsHome + pointsAway;
@@ -256,9 +256,10 @@ ${breakdown}`);
 
   // 🔒 Candado final para evitar repeticiones
   state.final = true;
-  notifiedGames.set(key, state);
-  notifiedGames.delete(key);
+  state.finalTime = Date.now(); // guardamos hora de finalización
+  notifiedGames.set(key, state); // ✅ mantenemos el registro
 }
+
 
         });
       } catch (err) {
