@@ -121,7 +121,7 @@ function isOneMinuteQ4(status, timer) {
 // --- Cerrado: notificación al minuto 1 del Q4 ---
 if (isOneMinuteQ4(status, timer) && diff <= 2 && !state.q4_closed) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioGeneral = totalPoints / 3; // ✅ promedio general hasta Q3
+  const promedioGeneral = totalPoints / 3; // promedio general hasta Q3
   const estimadoFinal = totalPoints + promedioGeneral;
 
   sendNotification(`🔥 Partido cerrado detectado al minuto 1 del Q4
@@ -135,7 +135,6 @@ Liga: ${league} | País: ${country}
 
   state.q4_closed = true;
   state.initialTotal = totalPoints;
-  state.promedioGeneral = promedioGeneral;
   state.estimadoFinal = estimadoFinal;
   notifiedGames.set(key, state);
 }
@@ -143,7 +142,7 @@ Liga: ${league} | País: ${country}
 // --- Desbalanceado: notificación al minuto 1 del Q4 ---
 if (isOneMinuteQ4(status, timer) && diff >= 20 && !state.q4_blowout) {
   const totalPoints = pointsHome + pointsAway;
-  const promedioGeneral = totalPoints / 3; // ✅ promedio general hasta Q3
+  const promedioGeneral = totalPoints / 3; // promedio general hasta Q3
   const estimadoFinal = totalPoints + promedioGeneral;
 
   sendNotification(`⚡ Partido desbalanceado detectado al minuto 1 del Q4
@@ -157,10 +156,10 @@ Liga: ${league} | País: ${country}
 
   state.q4_blowout = true;
   state.initialTotal = totalPoints;
-  state.promedioGeneral = promedioGeneral;
   state.estimadoFinal = estimadoFinal;
   notifiedGames.set(key, state);
 }
+
 
 
           // --- Prórroga: notificación al entrar en vivo ---
