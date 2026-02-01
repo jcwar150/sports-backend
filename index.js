@@ -308,4 +308,16 @@ setInterval(() => {
     sendDailySummary();
   }
 }, 60 * 1000);
+// --- Limpieza de partidos finalizados cada hora ---
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, state] of notifiedGames.entries()) {
+    // Si el partido está marcado como final y pasaron más de 24h desde que terminó
+    if (state.final && state.finalTime && (now - state.finalTime) > 24 * 60 * 60 * 1000) {
+      notifiedGames.delete(key);
+      console.log(`🧹 Partido ${key} eliminado del registro (finalizado hace más de 24h)`);
+    }
+  }
+}, 60 * 60 * 1000);
+
 
