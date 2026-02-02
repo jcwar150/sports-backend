@@ -163,23 +163,23 @@ Liga: ${league} | País: ${country}
             state.estimadoFinal = estimadoFinal;
             notifiedGames.set(key, state);
           }
-// --- Prórroga: notificación al entrar en vivo ---
-if (status && (status.toUpperCase().includes("OT") || status.toUpperCase().includes("ET")) && !state.ot && !state.final) {
-  const totalPoints = pointsHome + pointsAway;
-  const suggestion = totalPoints + 26;
+ // --- Prórroga: notificación al entrar en vivo ---
+          if (status && (status.toUpperCase().includes("OT") || status.toUpperCase().includes("ET")) 
+              && !state.ot && !state.final) {
+            const totalPoints = pointsHome + pointsAway;
+            const suggestion = totalPoints + 26;
 
-  sendNotification(`⏱️ Prórroga detectada
+            sendNotification(`⏱️ Prórroga detectada
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
-  state.ot = true;                 // candado: ya se notificó la prórroga
-  state.initialTotal = totalPoints;
-  notifiedGames.set(key, state);   // mantener hasta FT/AOT
-}
-
+            state.ot = true;                 // candado: ya se notificó la prórroga
+            state.initialTotal = totalPoints;
+            notifiedGames.set(key, state);   // mantener hasta FT/AOT
+          }
 
           // --- Evaluación final ---
           if ((status === "FT" || status === "AOT") && !state.final) {
@@ -262,6 +262,7 @@ ${breakdown}`);
             notifiedGames.set(key, state); // mantener el estado con candados activos
             // ❌ no borrar aquí, deja que otro proceso de limpieza lo haga
           }
+
  });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -301,6 +302,13 @@ function sendDailySummary() {
     blowout: { won: 0, lost: 0 },
     total: { won: 0, lost: 0 }
   };
+
+  // Limpieza de partidos finalizados
+  notifiedGames.forEach((state, key) => {
+    if (state.final) {
+      notifiedGames.delete(key);
+    }
+  });
 }
 
 // --- Loop para enviar resumen a las 23:59 ---
@@ -310,3 +318,4 @@ setInterval(() => {
     sendDailySummary();
   }
 }, 60 * 1000);
+
