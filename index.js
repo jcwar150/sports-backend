@@ -163,22 +163,23 @@ Liga: ${league} | País: ${country}
             state.estimadoFinal = estimadoFinal;
             notifiedGames.set(key, state);
           }
- // --- Prórroga: notificación al entrar en vivo ---
-          if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
-            const totalPoints = pointsHome + pointsAway;
-            const suggestion = totalPoints + 26;
+// --- Prórroga: notificación al entrar en vivo ---
+if (status && (status.toUpperCase().includes("OT") || status.toUpperCase().includes("ET")) && !state.ot && !state.final) {
+  const totalPoints = pointsHome + pointsAway;
+  const suggestion = totalPoints + 26;
 
-            sendNotification(`⏱️ Prórroga detectada
+  sendNotification(`⏱️ Prórroga detectada
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
-            state.ot = true;                 // candado: ya se notificó la prórroga
-            state.initialTotal = totalPoints;
-            notifiedGames.set(key, state);   // mantener hasta FT/AOT
-          }
+  state.ot = true;                 // candado: ya se notificó la prórroga
+  state.initialTotal = totalPoints;
+  notifiedGames.set(key, state);   // mantener hasta FT/AOT
+}
+
 
           // --- Evaluación final ---
           if ((status === "FT" || status === "AOT") && !state.final) {
