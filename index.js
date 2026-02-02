@@ -117,7 +117,7 @@ function getLiveBasketEvents() {
           function isOneMinuteQ4(status, timer) {
             if (status !== "Q4") return false;
             const [min] = timer.split(":").map(Number);
-            return min === 1;
+            return min === 7;
           }
 
           // --- Cerrado: notificación al minuto 1 del Q4 ---
