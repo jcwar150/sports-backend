@@ -103,22 +103,23 @@ function getLiveBasketEvents() {
           const diff = Math.abs(pointsHome - pointsAway);
           const key = `${home} vs ${away}`;
 
-         let state = notifiedGames.get(key) || {
-  q4_closed: false,
-  q4_blowout: false,
-  ot: false,
-  otFinal: false,
-  final: false,
-  initialTotal: 0,
-  estimadoFinal: 0
-};
-
+          let state = notifiedGames.get(key) || {
+            q4_closed: false,
+            q4_blowout: false,
+            ot: false,
+            otFinal: false,
+            final: false,
+            initialTotal: 0,
+            estimadoFinal: 0
+          };
 
           // Función auxiliar: detecta si estamos en el minuto 1 del último cuarto (Q4)
           function isOneMinuteQ4(status, timer) {
-            if (status !== "Q4") return false;
-            const [min] = timer.split(":").map(Number);
-            return min === 4;
+            if (!status || !status.toUpperCase().includes("Q4")) return false;
+            if (!timer) return false;
+            const [min] = timer.split(":");
+            const minutes = parseInt(min, 10);
+            return minutes === 1;
           }
 
           // --- Cerrado: notificación al minuto 1 del Q4 ---
@@ -162,7 +163,7 @@ Liga: ${league} | País: ${country}
             state.estimadoFinal = estimadoFinal;
             notifiedGames.set(key, state);
           }
-// --- Prórroga: notificación al entrar en vivo ---
+ // --- Prórroga: notificación al entrar en vivo ---
           if ((status === "OT" || status === "ET" || status.startsWith("OT")) && !state.ot && !state.final) {
             const totalPoints = pointsHome + pointsAway;
             const suggestion = totalPoints + 26;
@@ -247,18 +248,20 @@ Liga: ${league} | País: ${country}
                 .map(o => `• ${o.label}: ${o.win ? "Ganaste" : "Perdiste"} | Sugerencia: ${o.suggestion}`)
                 .join("\n");
 
-             sendNotification(`✅ Partido terminado: ${home} vs ${away}
+              sendNotification(`✅ Partido terminado: ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 Resultado final: ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
 🎯 Resultado general: ${resultText}
 ${breakdown}`);
+            }
 
-state.final = true;          // marcar después de enviar
-notifiedGames.set(key, state); // mantener el estado con candados activos
-// ❌ no borrar aquí, deja que otro proceso de limpieza lo haga
-
-  });
+            // 🔒 Candado final para evitar repeticiones
+            state.final = true;          
+            notifiedGames.set(key, state); // mantener el estado con candados activos
+            // ❌ no borrar aquí, deja que otro proceso de limpieza lo haga
+          }
+ });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
       }
@@ -306,5 +309,3 @@ setInterval(() => {
     sendDailySummary();
   }
 }, 60 * 1000);
-
-
