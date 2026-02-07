@@ -16,7 +16,6 @@ let currentDate = new Date().toISOString().split("T")[0];
 const excludedCountries = ["Kazakhstan", "Russia","Taiwan","Montenegro","Bosnia-and-Herzegovina"];
 
 let dailyStats = {
-  closed: { won: 0, lost: 0 },
   overtime: { won: 0, lost: 0 },
   blowout: { won: 0, lost: 0 },
   total: { won: 0, lost: 0 }
@@ -27,28 +26,11 @@ function resetDailyGamesIfNeeded() {
   if (today !== currentDate) {
     dailyGames = {};
     dailyStats = {
-      closed: { won: 0, lost: 0 },
       overtime: { won: 0, lost: 0 },
       blowout: { won: 0, lost: 0 },
       total: { won: 0, lost: 0 }
     };
     currentDate = today;
-  }
-}
-
-function saveGameRecord(game) {
-  const key = `${game.teams?.home?.name} vs ${game.teams?.away?.name}`;
-  if (!dailyGames[key]) {
-    dailyGames[key] = {
-      home: game.teams?.home?.name,
-      away: game.teams?.away?.name,
-      league: game.league?.name,
-      country: game.country?.name,
-      status: game.status?.short,
-      time: game.status?.timer || null,
-      pointsHome: game.scores?.home?.total,
-      pointsAway: game.scores?.away?.total
-    };
   }
 }
 
@@ -104,7 +86,6 @@ function getLiveBasketEvents() {
           const key = `${home} vs ${away}`;
 
           let state = notifiedGames.get(key) || {
-            q4_closed: false,
             q4_blowout: false,
             ot: false,
             otFinal: false,
@@ -113,34 +94,12 @@ function getLiveBasketEvents() {
             estimadoFinal: 0
           };
 
-          // Función auxiliar: detecta si estamos en el minuto 1 del último cuarto (Q4)
           function isOneMinuteQ4(status, timer) {
             if (!status || !status.toUpperCase().includes("Q4")) return false;
             if (!timer) return false;
             const [min] = timer.split(":");
             const minutes = parseInt(min, 10);
             return minutes === 1;
-          }
-
-          // --- Cerrado: notificación al minuto 1 del Q4 ---
-          if (isOneMinuteQ4(status, timer) && diff <= 2 && !state.q4_closed) {
-            const totalPointsQ3 = pointsHome + pointsAway;
-            const promedioQ = totalPointsQ3 / 3;
-            const estimadoFinal = totalPointsQ3 + promedioQ;
-
-            sendNotification(`🔥 Partido cerrado detectado al minuto 1 del Q4
-${home} vs ${away}
-Liga: ${league} | País: ${country}
-🏀 ${pointsHome} - ${pointsAway}
-⏱️ Tiempo transcurrido: ${timer}
-📊 Total puntos hasta Q3: ${totalPointsQ3}
-💡 Promedio: ${promedioQ.toFixed(1)} puntos por cuarto
-👉 Estimado final: ${estimadoFinal.toFixed(0)} puntos`);
-
-            state.q4_closed = true;
-            state.initialTotal = totalPointsQ3;
-            state.estimadoFinal = estimadoFinal;
-            notifiedGames.set(key, state);
           }
 
           // --- Desbalanceado: notificación al minuto 1 del Q4 ---
@@ -163,7 +122,7 @@ Liga: ${league} | País: ${country}
             state.estimadoFinal = estimadoFinal;
             notifiedGames.set(key, state);
           }
- // --- Prórroga: notificación al entrar en vivo ---
+  // --- Prórroga: notificación al entrar en vivo ---
           if (status && (status.toUpperCase().includes("OT") || status.toUpperCase().includes("ET")) 
               && !state.ot && !state.final) {
             const totalPoints = pointsHome + pointsAway;
@@ -176,34 +135,16 @@ Liga: ${league} | País: ${country}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
-            state.ot = true;                 // candado: ya se notificó la prórroga
+            state.ot = true;
             state.initialTotal = totalPoints;
-            notifiedGames.set(key, state);   // mantener hasta FT/AOT
+            notifiedGames.set(key, state);
           }
 
           // --- Evaluación final ---
           if ((status === "FT" || status === "AOT") && !state.final) {
-            if (state.q4_closed || state.q4_blowout || state.ot) {
+            if (state.q4_blowout || state.ot) {
               const totalPoints = pointsHome + pointsAway;
               const outcomes = [];
-
-              // Cerrado
-              if (state.q4_closed) {
-                const estimadoFinal = state.estimadoFinal || 0;
-                const closedWin = totalPoints >= estimadoFinal;
-
-                outcomes.push({
-                  label: "Cerrado",
-                  win: closedWin,
-                  suggestion: `Total final ≥ ${estimadoFinal.toFixed(0)} puntos`
-                });
-
-                if (closedWin) {
-                  dailyStats.closed.won++; dailyStats.total.won++;
-                } else {
-                  dailyStats.closed.lost++; dailyStats.total.lost++;
-                }
-              }
 
               // Desbalanceado
               if (state.q4_blowout) {
@@ -239,7 +180,7 @@ Liga: ${league} | País: ${country}
                   dailyStats.overtime.lost++; dailyStats.total.lost++;
                 }
 
-                state.otFinal = true; // ✅ candado específico para prórroga
+                state.otFinal = true;
               }
 
               const overallWin = outcomes.some(o => o.win);
@@ -257,12 +198,9 @@ Liga: ${league} | País: ${country}
 ${breakdown}`);
             }
 
-            // 🔒 Candado final para evitar repeticiones
             state.final = true;          
-            notifiedGames.set(key, state); // mantener el estado con candados activos
-            // ❌ no borrar aquí, deja que otro proceso de limpieza lo haga
+            notifiedGames.set(key, state);
           }
-
  });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -288,22 +226,21 @@ function sendDailySummary() {
   };
 
   const msg = `📊 Resumen del día (${currentDate})
-- Partido cerrado: Ganados ${dailyStats.closed.won}, Perdidos ${dailyStats.closed.lost}, %Ganados ${calcPercent(dailyStats.closed.won, dailyStats.closed.lost)}
 - Prórroga: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
 - Desbalanceados: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
 - General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
 
+  // ✅ Primero enviar el resumen
   sendNotification(msg);
 
-  // Reset stats para el nuevo día
+  // ✅ Luego resetear estadísticas
   dailyStats = {
-    closed: { won: 0, lost: 0 },
     overtime: { won: 0, lost: 0 },
     blowout: { won: 0, lost: 0 },
     total: { won: 0, lost: 0 }
   };
 
-  // Limpieza de partidos finalizados
+  // ✅ Finalmente limpiar partidos finalizados
   notifiedGames.forEach((state, key) => {
     if (state.final) {
       notifiedGames.delete(key);
