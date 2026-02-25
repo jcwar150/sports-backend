@@ -17,8 +17,9 @@ const req = https.request(options, res => {
   res.on("end", () => {
     try {
       const json = JSON.parse(data);
-      const games = json.data || json.events || json.response || [];
+      console.log("🔍 Claves en la respuesta:", Object.keys(json));
 
+      const games = json.data || json.events || json.response || [];
       if (games.length === 0) {
         console.log("⚠️ No se encontraron partidos en vivo.");
       } else {
