@@ -13,7 +13,7 @@ let notifiedGames = new Map();
 let currentDate = new Date().toISOString().split("T")[0];
 
 // --- Servidor Express ---
-app.get("/", (req, res) => res.send("🏀 Worker de deportes corriendo con RapidAPI"));
+app.get("/", (req, res) => res.send("⚽ Worker de fútbol corriendo con RapidAPI"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
 // --- Función para enviar notificaciones a OneSignal ---
@@ -39,13 +39,13 @@ async function sendNotification(message) {
   }
 }
 
-// --- Función para consultar RapidAPI ---
-function fetchRapidAPI(path) {
+// --- Función para consultar partidos en vivo ---
+function fetchLiveFootball() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
     port: null,
-    path: path,
+    path: "/api/v1/sport/football/events/live",
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -60,21 +60,22 @@ function fetchRapidAPI(path) {
         const json = JSON.parse(data);
 
         // --- Recorrer partidos en vivo ---
-        if (json && json.data) {
-          json.data.forEach(game => {
-            const home = game.homeTeam?.name;
-            const away = game.awayTeam?.name;
-            const status = game.status?.type;
+        const games = json.data || json.events || json.response || [];
+
+        if (games.length === 0) {
+          console.log("⚠️ No se encontraron partidos en vivo.");
+        } else {
+          games.forEach(game => {
+            const home = game.homeTeam?.name || game.teams?.home?.name;
+            const away = game.awayTeam?.name || game.teams?.away?.name;
+            const status = game.status?.type || game.status?.short || "live";
             const key = `${home} vs ${away}`;
 
-            // Solo notificar partidos en vivo
-            if (status === "inprogress" && !notifiedGames.has(key)) {
-              sendNotification(`🏀 Partido en vivo: ${home} vs ${away}`);
+            if (!notifiedGames.has(key)) {
+              sendNotification(`⚽ Partido en vivo: ${home} vs ${away} | Estado: ${status}`);
               notifiedGames.set(key, true); // candado para no repetir
             }
           });
-        } else {
-          console.log("⚠️ No se encontraron partidos en vivo.");
         }
       } catch (err) {
         console.error("❌ Error parseando respuesta:", err.message);
@@ -88,8 +89,9 @@ function fetchRapidAPI(path) {
 
 // --- Loop cada 5 minutos ---
 setInterval(() => {
-  console.log("🔄 Consultando partidos de básquet en vivo...");
-  fetchRapidAPI("/api/v1/sport/basketball/events/live");
+  console.log("🔄 Consultando partidos de fútbol en vivo...");
+  fetchLiveFootball();
 }, 5 * 60 * 1000);
+
 
 
