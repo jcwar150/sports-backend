@@ -4,7 +4,7 @@ const options = {
   method: "GET",
   hostname: "sportapi7.p.rapidapi.com",
   port: null,
-  path: "/api/v1/sport/1/events/live", // ⚽ Fútbol (ID=1)
+  path: "/api/v1/sport/football/events/live", // ⚽ partidos en vivo de fútbol
   headers: {
     "x-rapidapi-key": process.env.FOOTBALL_API_KEY,
     "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -17,19 +17,7 @@ const req = https.request(options, res => {
   res.on("end", () => {
     try {
       const json = JSON.parse(data);
-      console.log("🔍 Claves en la respuesta:", Object.keys(json));
-
-      const games = json.data || json.events || json.response || [];
-      if (games.length === 0) {
-        console.log("⚠️ No se encontraron partidos en vivo.");
-      } else {
-        games.forEach(game => {
-          const home = game.homeTeam?.name || game.teams?.home?.name;
-          const away = game.awayTeam?.name || game.teams?.away?.name;
-          const status = game.status?.type || game.status?.short || "live";
-          console.log(`🏟️ ${home} vs ${away} | Estado: ${status}`);
-        });
-      }
+      console.log("🔍 Respuesta completa:", JSON.stringify(json, null, 2));
     } catch (err) {
       console.error("❌ Error parseando respuesta:", err.message);
     }
@@ -38,7 +26,5 @@ const req = https.request(options, res => {
 
 req.on("error", err => console.error("❌ Error en la petición:", err.message));
 req.end();
-
-
 
 
