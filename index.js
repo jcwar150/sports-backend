@@ -2,7 +2,7 @@ const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
-const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; // ✅ tu RapidAPI key
+const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; 
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
@@ -10,13 +10,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 let notifiedGames = new Map();
-let currentDate = new Date().toISOString().split("T")[0];
 
-// --- Servidor Express ---
-app.get("/", (req, res) => res.send("⚽ Worker de fútbol corriendo con RapidAPI"));
+app.get("/", (req, res) => res.send("⚽ Worker corriendo con RapidAPI"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
-// --- Función para enviar notificaciones a OneSignal ---
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -39,13 +36,12 @@ async function sendNotification(message) {
   }
 }
 
-// --- Función para consultar partidos en vivo ---
-function fetchLiveFootball() {
+function fetchLiveEvents(sportId) {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
     port: null,
-    path: "/api/v1/sport/football/events/live",
+    path: `/api/v1/sport/${sportId}/events/live`,
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -58,8 +54,6 @@ function fetchLiveFootball() {
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
-
-        // --- Recorrer partidos en vivo ---
         const games = json.data || json.events || json.response || [];
 
         if (games.length === 0) {
@@ -72,8 +66,8 @@ function fetchLiveFootball() {
             const key = `${home} vs ${away}`;
 
             if (!notifiedGames.has(key)) {
-              sendNotification(`⚽ Partido en vivo: ${home} vs ${away} | Estado: ${status}`);
-              notifiedGames.set(key, true); // candado para no repetir
+              sendNotification(`🎮 Partido en vivo: ${home} vs ${away} | Estado: ${status}`);
+              notifiedGames.set(key, true);
             }
           });
         }
@@ -87,11 +81,14 @@ function fetchLiveFootball() {
   req.end();
 }
 
-// --- Loop cada 5 minutos ---
+// --- Loop cada 5 minutos: fútbol (ID=1) y básquet (ID=3) ---
 setInterval(() => {
   console.log("🔄 Consultando partidos de fútbol en vivo...");
-  fetchLiveFootball();
+  fetchLiveEvents(1); // fútbol
+  console.log("🔄 Consultando partidos de básquet en vivo...");
+  fetchLiveEvents(3); // básquet
 }, 5 * 60 * 1000);
+
 
 
 
