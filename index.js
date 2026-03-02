@@ -1,47 +1,13 @@
 const https = require("https");
-const axios = require("axios");
-const express = require("express");
 
-const API_SPORT_KEY = process.env.FOOTBALL_API_KEY;
-const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
-const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => res.send("⚽🏀🏒 Worker corriendo con RapidAPI"));
-app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
-
-async function sendNotification(message) {
-  try {
-    await axios.post(
-      "https://api.onesignal.com/notifications",
-      {
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"],
-        contents: { en: message }
-      },
-      {
-        headers: {
-          Authorization: `Basic ${ONESIGNAL_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    console.log("📢 Notificación enviada:", message);
-  } catch (err) {
-    console.error("❌ Error enviando notificación:", err.response?.data || err.message);
-  }
-}
-
-function fetchLiveEvents(sportId, sportName, callback) {
+function fetchLiveCategories(sportId, sportName) {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
     port: null,
-    path: `/api/v1/sport/${sportId}/events/live`,
+    path: `/api/v1/sport/${sportId}/live-categories`,
     headers: {
-      "x-rapidapi-key": API_SPORT_KEY,
+      "x-rapidapi-key": process.env.FOOTBALL_API_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
     }
   };
@@ -52,50 +18,69 @@ function fetchLiveEvents(sportId, sportName, callback) {
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
-        const games = json.data || json.events || json.response || [];
-        let message = "";
+        const categories = json.data || json.response || [];
+        console.log(`📌 Categorías en vivo de ${sportName}:`, categories.map(c => c.name));
 
-        games.forEach(game => {
-          const home = game.homeTeam?.name || game.teams?.home?.name;
-          const away = game.awayTeam?.name || game.teams?.away?.name;
-          const status = game.status?.type || game.status?.short || "live";
-          message += `• ${sportName}: ${home} vs ${away} (${status})\n`;
+        categories.forEach(cat => {
+          fetchLiveEventsByCategory(sportId, cat.id, sportName, cat.name, cat.country?.name);
         });
-
-        callback(message);
       } catch (err) {
-        console.error("❌ Error parseando respuesta:", err.message);
-        callback("");
+        console.error("❌ Error parseando categorías:", err.message);
       }
     });
   });
 
-  req.on("error", err => {
-    console.error("❌ Error en la petición:", err.message);
-    callback("");
-  });
+  req.on("error", err => console.error("❌ Error petición categorías:", err.message));
   req.end();
 }
 
-// --- Loop cada 10 minutos ---
-setInterval(() => {
-  console.log("🔄 Consultando partidos en vivo...");
+function fetchLiveEventsByCategory(sportId, categoryId, sportName, categoryName, countryName) {
+  const options = {
+    method: "GET",
+    hostname: "sportapi7.p.rapidapi.com",
+    port: null,
+    path: `/api/v1/sport/${sportId}/events/live?categoryId=${categoryId}`,
+    headers: {
+      "x-rapidapi-key": process.env.FOOTBALL_API_KEY,
+      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
+    }
+  };
 
-  let allMessages = "";
-
-  fetchLiveEvents(1, "⚽ Fútbol", msg1 => {
-    allMessages += msg1;
-    fetchLiveEvents(3, "🏀 Básquet", msg2 => {
-      allMessages += msg2;
-      fetchLiveEvents(4, "🏒 Hockey", msg3 => {
-        allMessages += msg3;
-
-        if (allMessages.trim().length > 0) {
-          sendNotification(allMessages.trim());
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const json = JSON.parse(data);
+        const games = json.data || json.events || [];
+        if (games.length === 0) {
+          console.log(`⚠️ No se encontraron partidos en ${categoryName}`);
         } else {
-          console.log("⚠️ No se encontraron partidos en vivo en ninguno de los deportes.");
+          games.forEach(game => {
+            const home = game.homeTeam?.name || game.teams?.home?.name;
+            const away = game.awayTeam?.name || game.teams?.away?.name;
+            const homeScore = game.homeScore?.current ?? game.scores?.home ?? 0;
+            const awayScore = game.awayScore?.current ?? game.scores?.away ?? 0;
+            const status = game.status?.type || game.status?.short || "live";
+
+            console.log(
+              `🏟️ ${sportName} - ${categoryName} (${countryName || "País desconocido"}):\n` +
+              `   ${home} ${homeScore} - ${awayScore} ${away} | Estado: ${status}`
+            );
+          });
         }
-      });
+      } catch (err) {
+        console.error("❌ Error parseando partidos:", err.message);
+      }
     });
   });
-}, 10 * 60 * 1000);
+
+  req.on("error", err => console.error("❌ Error petición partidos:", err.message));
+  req.end();
+}
+
+// --- Prueba inmediata ---
+fetchLiveCategories(1, "Fútbol");
+fetchLiveCategories(3, "Básquet");
+fetchLiveCategories(4, "Hockey");
+
