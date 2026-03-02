@@ -2,31 +2,40 @@ const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
+const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; // tu RapidAPI key
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
+const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Función para enviar notificación a OneSignal
+app.get("/", (req, res) => res.send("⚽🏀🏒 Worker de deportes corriendo en Render"));
+app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
+
+// --- Función para enviar notificación a OneSignal ---
 async function sendNotification(message) {
   try {
-    const response = await axios.post("https://api.onesignal.com/notifications", {
-      app_id: process.env.ONESIGNAL_APP_ID, // tu App ID
-      included_segments: ["All"], // a quién enviar
-      headings: { en: "Partido en vivo" },
-      contents: { en: message }
-    }, {
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Authorization": `Basic ${process.env.ONESIGNAL_REST_API_KEY}` // tu REST API Key
+    await axios.post(
+      "https://api.onesignal.com/notifications",
+      {
+        app_id: ONESIGNAL_APP_ID,
+        included_segments: ["All"],
+        contents: { en: message }
+      },
+      {
+        headers: {
+          Authorization: `Basic ${ONESIGNAL_API_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
-    });
-
-    console.log("📲 Notificación enviada:", response.data);
+    );
+    console.log("📲 Notificación enviada:", message);
   } catch (err) {
-    console.error("❌ Error enviando notificación:", err.message);
+    console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
 
-// Función para obtener partidos en vivo y enviar notificación
+// --- Función para obtener partidos en vivo ---
 function fetchLiveEvents(sportSlug, sportName) {
   const options = {
     method: "GET",
@@ -34,7 +43,7 @@ function fetchLiveEvents(sportSlug, sportName) {
     port: null,
     path: `/api/v1/sport/${sportSlug}/events/live`,
     headers: {
-      "x-rapidapi-key": process.env.FOOTBALL_API_KEY,
+      "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
     }
   };
@@ -67,6 +76,8 @@ function fetchLiveEvents(sportSlug, sportName) {
             const message = `${sportName} - ${league} (${country})\n${home} ${homeScore} - ${awayScore} ${away} | ${status} ${minutesPlayed}`;
             await sendNotification(message);
           }
+        } else {
+          console.log(`⚠️ No se encontraron partidos en vivo de ${sportName}.`);
         }
       } catch (err) {
         console.error("❌ Error parseando respuesta:", err.message);
@@ -78,23 +89,12 @@ function fetchLiveEvents(sportSlug, sportName) {
   req.end();
 }
 
-// --- Ejecutar cada 10 minutos ---
+// --- Loop cada 10 minutos ---
 setInterval(() => {
+  console.log("🔄 Buscando partidos en vivo...");
   fetchLiveEvents("football", "Fútbol");
   fetchLiveEvents("basketball", "Básquet");
   fetchLiveEvents("hockey", "Hockey");
 }, 10 * 60 * 1000);
-
-// Endpoint para probar manualmente
-app.get("/test", (req, res) => {
-  fetchLiveEvents("football", "Fútbol");
-  fetchLiveEvents("basketball", "Básquet");
-  fetchLiveEvents("hockey", "Hockey");
-  res.send("✅ Notificaciones enviadas si hay partidos en vivo.");
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-});
 
 
