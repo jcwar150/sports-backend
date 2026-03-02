@@ -5,7 +5,7 @@ function fetchLiveEvents(sportSlug, sportName) {
     method: 'GET',
     hostname: 'sportapi7.p.rapidapi.com',
     port: null,
-    path: `/api/v1/sport/${sportSlug}/events/live`, // usando el nombre del deporte
+    path: `/api/v1/sport/${sportSlug}/events/live`,
     headers: {
       'x-rapidapi-key': process.env.FOOTBALL_API_KEY,
       'x-rapidapi-host': 'sportapi7.p.rapidapi.com'
@@ -15,15 +15,12 @@ function fetchLiveEvents(sportSlug, sportName) {
   const req = https.request(options, function (res) {
     const chunks = [];
 
-    res.on('data', function (chunk) {
-      chunks.push(chunk);
-    });
+    res.on('data', chunk => chunks.push(chunk));
 
     res.on('end', function () {
       const body = Buffer.concat(chunks);
       try {
         const json = JSON.parse(body.toString());
-        console.log(`🔍 Respuesta completa ${sportName}:`, JSON.stringify(json, null, 2));
 
         const games = json.data || json.events || [];
         if (games.length === 0) {
@@ -39,9 +36,17 @@ function fetchLiveEvents(sportSlug, sportName) {
             const country = game.uniqueTournament?.category?.country?.name || "País desconocido";
             const status = game.status?.description || game.status?.type || "live";
 
+            // Calcular minutos jugados
+            let minutesPlayed = "";
+            if (game.time?.currentPeriodStartTimestamp && game.startTimestamp) {
+              const now = Math.floor(Date.now() / 1000); // tiempo actual en segundos
+              const elapsed = Math.floor((now - game.startTimestamp) / 60); // minutos desde inicio
+              minutesPlayed = `${elapsed}'`;
+            }
+
             console.log(
-              `🏟️ ${sportName} - ${league} (${country}):\n` +
-              `   ${home} ${homeScore} - ${awayScore} ${away} | Estado: ${status}`
+              `🏟️ ${sportName} - ${league} (${country})\n` +
+              `   ${home} ${homeScore} - ${awayScore} ${away} | ${status} ${minutesPlayed}`
             );
           });
         }
