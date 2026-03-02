@@ -15,7 +15,7 @@ app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 // --- Función para enviar notificación a OneSignal ---
 async function sendNotification(message) {
   try {
-    await axios.post(
+    const response = await axios.post(
       "https://api.onesignal.com/notifications",
       {
         app_id: ONESIGNAL_APP_ID,
@@ -29,7 +29,7 @@ async function sendNotification(message) {
         }
       }
     );
-    console.log("📲 Notificación enviada:", message);
+    console.log("📲 Notificación enviada:", response.data);
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
@@ -74,7 +74,8 @@ function fetchLiveEvents(sportSlug, sportName) {
             }
 
             const message = `${sportName} - ${league} (${country})\n${home} ${homeScore} - ${awayScore} ${away} | ${status} ${minutesPlayed}`;
-            await sendNotification(message);
+            console.log("📊 Partido:", message); // Mostrar en consola
+            await sendNotification(message); // Enviar notificación
           }
         } else {
           console.log(`⚠️ No se encontraron partidos en vivo de ${sportName}.`);
@@ -96,5 +97,10 @@ setInterval(() => {
   fetchLiveEvents("basketball", "Básquet");
   fetchLiveEvents("hockey", "Hockey");
 }, 10 * 60 * 1000);
+
+// --- Llamada inicial para probar inmediatamente ---
+fetchLiveEvents("football", "Fútbol");
+fetchLiveEvents("basketball", "Básquet");
+fetchLiveEvents("hockey", "Hockey");
 
 
