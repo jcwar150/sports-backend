@@ -2,14 +2,12 @@ const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
-const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; 
+const API_SPORT_KEY = process.env.FOOTBALL_API_KEY;
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-let notifiedGames = new Map();
 
 app.get("/", (req, res) => res.send("⚽🏀🏒 Worker corriendo con RapidAPI"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
@@ -36,7 +34,7 @@ async function sendNotification(message) {
   }
 }
 
-function fetchLiveEvents(sportId, sportName) {
+function fetchLiveEvents(sportId, sportName, callback) {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -55,43 +53,49 @@ function fetchLiveEvents(sportId, sportName) {
       try {
         const json = JSON.parse(data);
         const games = json.data || json.events || json.response || [];
+        let message = "";
 
-        if (games.length === 0) {
-          console.log(`⚠️ No se encontraron partidos en vivo de ${sportName}.`);
-        } else {
-          let message = `${sportName} en vivo:\n`;
-          games.forEach(game => {
-            const home = game.homeTeam?.name || game.teams?.home?.name;
-            const away = game.awayTeam?.name || game.teams?.away?.name;
-            const status = game.status?.type || game.status?.short || "live";
-            const key = `${sportName}-${home} vs ${away}`;
+        games.forEach(game => {
+          const home = game.homeTeam?.name || game.teams?.home?.name;
+          const away = game.awayTeam?.name || game.teams?.away?.name;
+          const status = game.status?.type || game.status?.short || "live";
+          message += `• ${sportName}: ${home} vs ${away} (${status})\n`;
+        });
 
-            message += `• ${home} vs ${away} (${status})\n`;
-
-            if (!notifiedGames.has(key)) {
-              notifiedGames.set(key, true);
-            }
-          });
-
-          // Enviar una sola notificación con todos los partidos de ese deporte
-          sendNotification(message.trim());
-        }
+        callback(message);
       } catch (err) {
         console.error("❌ Error parseando respuesta:", err.message);
+        callback("");
       }
     });
   });
 
-  req.on("error", err => console.error("❌ Error en la petición:", err.message));
+  req.on("error", err => {
+    console.error("❌ Error en la petición:", err.message);
+    callback("");
+  });
   req.end();
 }
 
 // --- Loop cada 10 minutos ---
 setInterval(() => {
   console.log("🔄 Consultando partidos en vivo...");
-  fetchLiveEvents(1, "⚽ Fútbol");
-  fetchLiveEvents(3, "🏀 Básquet");
-  fetchLiveEvents(4, "🏒 Hockey");
+
+  let allMessages = "";
+
+  fetchLiveEvents(1, "⚽ Fútbol", msg1 => {
+    allMessages += msg1;
+    fetchLiveEvents(3, "🏀 Básquet", msg2 => {
+      allMessages += msg2;
+      fetchLiveEvents(4, "🏒 Hockey", msg3 => {
+        allMessages += msg3;
+
+        if (allMessages.trim().length > 0) {
+          sendNotification(allMessages.trim());
+        } else {
+          console.log("⚠️ No se encontraron partidos en vivo en ninguno de los deportes.");
+        }
+      });
+    });
+  });
 }, 10 * 60 * 1000);
-
-
