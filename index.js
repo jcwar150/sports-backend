@@ -2,7 +2,7 @@ const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
-const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; // tu RapidAPI key
+const API_SPORT_KEY = process.env.FOOTBALL_API_KEY;
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 3000;
 app.get("/", (req, res) => res.send("⚽🏀🏒 Worker de deportes corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
-// --- Función para enviar notificación a OneSignal ---
 async function sendNotification(message) {
   try {
     const response = await axios.post(
@@ -35,7 +34,6 @@ async function sendNotification(message) {
   }
 }
 
-// --- Función para obtener partidos en vivo ---
 function fetchLiveEvents(sportSlug, sportName) {
   const options = {
     method: "GET",
@@ -62,20 +60,11 @@ function fetchLiveEvents(sportSlug, sportName) {
             const homeScore = game.homeScore?.current ?? 0;
             const awayScore = game.awayScore?.current ?? 0;
 
-            // Liga y país: cubrir todas las variantes
-            const league =
-              game.uniqueTournament?.name ||
-              game.league?.name ||
-              game.category?.name ||
-              "Liga desconocida";
+            // Liga y país desde uniqueTournament
+            const league = game.uniqueTournament?.name || "Liga desconocida";
+            const country = game.uniqueTournament?.category?.country?.name || "País desconocido";
 
-            const country =
-              game.uniqueTournament?.category?.country?.name ||
-              game.country?.name ||
-              "País desconocido";
-
-            // Estado y tiempo
-            const status = game.status?.description || game.status?.short || "live";
+            const status = game.status?.description || game.status?.type || "live";
             const timer = game.status?.timer || "";
 
             const message = `${sportName} - ${league} (${country})\n${home} ${homeScore} - ${awayScore} ${away} | ${status} ${timer}`;
