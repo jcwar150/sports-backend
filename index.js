@@ -12,51 +12,6 @@ const PORT = process.env.PORT || 3000;
 app.get("/", (req, res) => res.send("⚽🏀🏒 Worker de deportes corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
-// --- Mapa de categorías por deporte ---
-let categoriesMap = {
-  football: new Map(),
-  basketball: new Map(),
-  hockey: new Map()
-};
-
-// --- Función para cargar categorías ---
-function fetchCategories(sportSlug) {
-  const options = {
-    method: "GET",
-    hostname: "sportapi7.p.rapidapi.com",
-    port: null,
-    path: `/api/v1/sport/${sportSlug}/categories`,
-    headers: {
-      "x-rapidapi-key": API_SPORT_KEY,
-      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
-    }
-  };
-
-  const req = https.request(options, res => {
-    let data = "";
-    res.on("data", chunk => (data += chunk));
-    res.on("end", () => {
-      try {
-        const json = JSON.parse(data);
-        if (json.data) {
-          json.data.forEach(cat => {
-            categoriesMap[sportSlug].set(cat.id, {
-              name: cat.name,
-              country: cat.country?.name || "País desconocido"
-            });
-          });
-          console.log(`📂 Categorías cargadas para ${sportSlug}: ${categoriesMap[sportSlug].size}`);
-        }
-      } catch (err) {
-        console.error("❌ Error parseando categorías:", err.message);
-      }
-    });
-  });
-
-  req.on("error", err => console.error("❌ Error en la petición categorías:", err.message));
-  req.end();
-}
-
 // --- Función para enviar notificación a OneSignal ---
 async function sendNotification(message) {
   try {
@@ -107,16 +62,20 @@ function fetchLiveEvents(sportSlug, sportName) {
             const homeScore = game.homeScore?.current ?? 0;
             const awayScore = game.awayScore?.current ?? 0;
 
-            // Buscar liga y país desde categorías
-            const catId = game.category?.id || game.uniqueTournament?.category?.id;
-            const catInfo = categoriesMap[sportSlug].get(catId) || {
-              name: game.uniqueTournament?.name || "Liga desconocida",
-              country: game.uniqueTournament?.category?.country?.name || "País desconocido"
-            };
+            // Liga y país: cubrir todas las variantes
+            const league =
+              game.uniqueTournament?.name ||
+              game.league?.name ||
+              game.category?.name ||
+              "Liga desconocida";
 
-            const league = catInfo.name;
-            const country = catInfo.country;
-            const status = game.status?.description || game.status?.type || "live";
+            const country =
+              game.uniqueTournament?.category?.country?.name ||
+              game.country?.name ||
+              "País desconocido";
+
+            // Estado y tiempo
+            const status = game.status?.description || game.status?.short || "live";
             const timer = game.status?.timer || "";
 
             const message = `${sportName} - ${league} (${country})\n${home} ${homeScore} - ${awayScore} ${away} | ${status} ${timer}`;
@@ -136,11 +95,6 @@ function fetchLiveEvents(sportSlug, sportName) {
   req.end();
 }
 
-// --- Cargar categorías al inicio ---
-fetchCategories("football");
-fetchCategories("basketball");
-fetchCategories("hockey");
-
 // --- Loop cada 10 minutos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos en vivo...");
@@ -149,9 +103,3 @@ setInterval(() => {
   fetchLiveEvents("hockey", "Hockey");
 }, 10 * 60 * 1000);
 
-// --- Llamada inicial para probar inmediatamente ---
-setTimeout(() => {
-  fetchLiveEvents("football", "Fútbol");
-  fetchLiveEvents("basketball", "Básquet");
-  fetchLiveEvents("hockey", "Hockey");
-}, 5000);
