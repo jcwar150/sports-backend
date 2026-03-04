@@ -98,8 +98,4 @@ setInterval(() => {
   fetchLiveEvents("hockey", "Hockey");
 }, 10 * 60 * 1000);
 
-// --- Llamada inicial para probar inmediatamente ---
-fetchLiveEvents("football", "Fútbol");
-fetchLiveEvents("basketball", "Básquet");
-fetchLiveEvents("hockey", "Hockey");
 
