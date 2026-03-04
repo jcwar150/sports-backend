@@ -9,7 +9,7 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("⚽ Worker de prueba corriendo en Render"));
+app.get("/", (req, res) => res.send("⚽ Worker de partidos en vivo corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
 // --- Notificación OneSignal ---
@@ -33,47 +33,6 @@ async function sendNotification(message) {
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
-}
-
-// --- Categorías en vivo ---
-function fetchLiveCategories(sportSlug, sportName) {
-  const options = {
-    method: "GET",
-    hostname: "sportapi7.p.rapidapi.com",
-    port: null,
-    path: `/api/v1/sport/${sportSlug}/live-categories`,
-    headers: {
-      "x-rapidapi-key": API_SPORT_KEY,
-      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
-    }
-  };
-
-  const req = https.request(options, res => {
-    let data = "";
-    res.on("data", chunk => (data += chunk));
-    res.on("end", async () => {
-      try {
-        const json = JSON.parse(data);
-        const categories = json.data || [];
-        if (categories.length > 0) {
-          let msg = `📂 Categorías en vivo de ${sportName}:\n`;
-          categories.forEach(cat => {
-            msg += `- ${cat.name} (${cat.country?.name}) | ID: ${cat.id}\n`;
-          });
-          console.log(msg);
-          await sendNotification(msg);
-        } else {
-          console.log(`⚠️ No hay categorías en vivo para ${sportName}.`);
-          await sendNotification(`⚠️ No hay categorías en vivo para ${sportName}.`);
-        }
-      } catch (err) {
-        console.error("❌ Error parseando categorías:", err.message);
-      }
-    });
-  });
-
-  req.on("error", err => console.error("❌ Error en la petición categorías:", err.message));
-  req.end();
 }
 
 // --- Partidos en vivo ---
@@ -128,9 +87,9 @@ function fetchLiveEvents(sportSlug, sportName) {
 
 // --- Loop cada 5 minutos ---
 setInterval(() => {
-  console.log("🔄 Probando categorías y partidos en vivo...");
-  fetchLiveCategories("football", "Fútbol");
+  console.log("🔄 Buscando partidos en vivo...");
   fetchLiveEvents("football", "Fútbol");
+  fetchLiveEvents("basketball", "Básquet");
+  fetchLiveEvents("hockey", "Hockey");
 }, 10 * 60 * 1000);
-
 
