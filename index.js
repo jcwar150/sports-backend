@@ -9,7 +9,7 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("⚽🏀🏒 Worker de deportes corriendo en Render"));
+app.get("/", (req, res) => res.send("⚽ Worker de prueba corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
 // --- Notificación OneSignal ---
@@ -76,7 +76,7 @@ function fetchLiveCategories(sportSlug, sportName) {
   req.end();
 }
 
-// --- Partidos en vivo (sin filtrar por categoría) ---
+// --- Partidos en vivo ---
 function fetchLiveEvents(sportSlug, sportName) {
   const options = {
     method: "GET",
@@ -126,7 +126,7 @@ function fetchLiveEvents(sportSlug, sportName) {
   req.end();
 }
 
-// --- Loop cada 5 minutos para probar ---
+// --- Loop cada 5 minutos ---
 setInterval(() => {
   console.log("🔄 Probando categorías y partidos en vivo...");
   fetchLiveCategories("football", "Fútbol");
