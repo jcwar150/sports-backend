@@ -2,7 +2,7 @@ const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
-const API_SPORT_KEY = process.env.BASKETBALL_API_KEY; // tu RapidAPI key
+const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; // clave única para todos los deportes
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
@@ -35,8 +35,9 @@ async function sendNotification(message) {
   }
 }
 
-// --- Array global para resultados ---
+// --- Arrays globales ---
 let results = [];
+let notifiedGames = new Set(); // para evitar notificaciones repetidas
 
 // --- Clasificación de partidos ---
 function classifyBasketballGame(game) {
@@ -49,20 +50,29 @@ function classifyBasketballGame(game) {
   const statusDesc = game.status?.description || "";
   const timer = game.status?.timer || "";
 
+  // ID único del partido para evitar duplicados
+  const gameId = `${home}-${away}-${statusDesc}`;
+
   // --- Último cuarto desbalanceado ---
   if (statusDesc.includes("4th quarter") && timer.startsWith("1'") && diff > 25) {
-    const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos al inicio del último cuarto.`;
-    console.log(message);
-    sendNotification(message);
-    results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
+    if (!notifiedGames.has(gameId)) {
+      const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos al inicio del último cuarto.`;
+      console.log(message);
+      sendNotification(message);
+      results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
+      notifiedGames.add(gameId);
+    }
   }
 
   // --- Prórroga ---
   if (statusDesc.includes("OT")) {
-    const message = `🏀 Partido en prórroga!\n${home} ${homeScore} - ${awayScore} ${away}`;
-    console.log(message);
-    sendNotification(message);
-    results.push({ type: "prorroga", diff, win: homeScore > awayScore });
+    if (!notifiedGames.has(gameId)) {
+      const message = `🏀 Partido en prórroga!\n${home} ${homeScore} - ${awayScore} ${away}`;
+      console.log(message);
+      sendNotification(message);
+      results.push({ type: "prorroga", diff, win: homeScore > awayScore });
+      notifiedGames.add(gameId);
+    }
   }
 }
 
@@ -112,8 +122,9 @@ function summarizeResults() {
   console.log(summary);
   sendNotification(summary);
 
-  // limpiar resultados para el siguiente día
+  // limpiar resultados y notificaciones para el siguiente día
   results = [];
+  notifiedGames.clear();
 }
 
 // --- Loop cada 10 minutos para partidos ---
