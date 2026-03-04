@@ -1,8 +1,8 @@
-const https = require("https");
+const http = require("https");
 const axios = require("axios");
 const express = require("express");
 
-const API_SPORT_KEY = process.env.FOOTBALL_API_KEY;
+const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; // tu RapidAPI key
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
@@ -48,12 +48,13 @@ function fetchLiveEvents(sportSlug, sportName) {
     }
   };
 
-  const req = https.request(options, res => {
-    let data = "";
-    res.on("data", chunk => (data += chunk));
+  const req = http.request(options, res => {
+    const chunks = [];
+    res.on("data", chunk => chunks.push(chunk));
     res.on("end", async () => {
       try {
-        const json = JSON.parse(data);
+        const body = Buffer.concat(chunks);
+        const json = JSON.parse(body.toString());
         const games = json.data || json.events || [];
         if (games.length > 0) {
           let msg = `🏟️ Partidos en vivo de ${sportName}:\n`;
