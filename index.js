@@ -2,14 +2,14 @@ const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
-const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; // tu RapidAPI key
+const API_SPORT_KEY = process.env.BASKETBALL_API_KEY; // tu RapidAPI key
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("⚽ Worker de partidos en vivo corriendo en Render"));
+app.get("/", (req, res) => res.send("🏀 Worker de básquet corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
 // --- Notificación OneSignal ---
@@ -35,13 +35,44 @@ async function sendNotification(message) {
   }
 }
 
-// --- Partidos en vivo ---
-function fetchLiveEvents(sportSlug, sportName) {
+// --- Array global para resultados ---
+let results = [];
+
+// --- Clasificación de partidos ---
+function classifyBasketballGame(game) {
+  const home = game.homeTeam?.name;
+  const away = game.awayTeam?.name;
+  const homeScore = game.homeScore?.current ?? 0;
+  const awayScore = game.awayScore?.current ?? 0;
+  const diff = Math.abs(homeScore - awayScore);
+
+  const statusDesc = game.status?.description || "";
+  const timer = game.status?.timer || "";
+
+  // --- Último cuarto desbalanceado ---
+  if (statusDesc.includes("4th quarter") && timer.startsWith("1'") && diff > 25) {
+    const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos al inicio del último cuarto.`;
+    console.log(message);
+    sendNotification(message);
+    results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
+  }
+
+  // --- Prórroga ---
+  if (statusDesc.includes("OT")) {
+    const message = `🏀 Partido en prórroga!\n${home} ${homeScore} - ${awayScore} ${away}`;
+    console.log(message);
+    sendNotification(message);
+    results.push({ type: "prorroga", diff, win: homeScore > awayScore });
+  }
+}
+
+// --- Obtener partidos en vivo ---
+function fetchLiveBasketball() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
     port: null,
-    path: `/api/v1/sport/${sportSlug}/events/live`,
+    path: `/api/v1/sport/basketball/events/live`,
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -51,46 +82,14 @@ function fetchLiveEvents(sportSlug, sportName) {
   const req = https.request(options, res => {
     let data = "";
     res.on("data", chunk => (data += chunk));
-    res.on("end", async () => {
+    res.on("end", () => {
       try {
         const json = JSON.parse(data);
         const games = json.data || json.events || [];
         if (games.length > 0) {
-          for (const game of games) {
-            const home = game.homeTeam?.name;
-            const away = game.awayTeam?.name;
-            const homeScore = game.homeScore?.current ?? 0;
-            const awayScore = game.awayScore?.current ?? 0;
-
-            // Liga y país: cubrir varias variantes
-            const league =
-              game.uniqueTournament?.name ||
-              game.tournament?.name ||
-              game.league?.name ||
-              "Liga desconocida";
-
-            const country =
-              game.uniqueTournament?.category?.country?.name ||
-              game.tournament?.category?.country?.name ||
-              game.country?.name ||
-              "País desconocido";
-
-            const status = game.status?.description || game.status?.type || "live";
-
-            // Calcular minutos jugados si hay timestamp
-            let minutesPlayed = "";
-            if (game.startTimestamp) {
-              const now = Math.floor(Date.now() / 1000);
-              const elapsed = Math.floor((now - game.startTimestamp) / 60);
-              minutesPlayed = `${elapsed}'`;
-            }
-
-            const message = `${sportName} - ${league} (${country})\n${home} ${homeScore} - ${awayScore} ${away} | ${status} ${minutesPlayed}`;
-            console.log("📊 Partido:", message);
-            await sendNotification(message);
-          }
+          games.forEach(game => classifyBasketballGame(game));
         } else {
-          console.log(`⚠️ No se encontraron partidos en vivo de ${sportName}.`);
+          console.log("⚠️ No se encontraron partidos en vivo de básquet.");
         }
       } catch (err) {
         console.error("❌ Error parseando respuesta:", err.message);
@@ -102,11 +101,31 @@ function fetchLiveEvents(sportSlug, sportName) {
   req.end();
 }
 
-// --- Loop cada 10 minutos ---
+// --- Resumen al final del día ---
+function summarizeResults() {
+  const total = results.length;
+  const wins = results.filter(r => r.win).length;
+  const losses = total - wins;
+  const avg = total > 0 ? (wins / total * 100).toFixed(2) : 0;
+
+  const summary = `📊 Resumen del día:\nTotal partidos: ${total}\nGanados: ${wins}\nPerdidos: ${losses}\nPromedio de éxito: ${avg}%`;
+  console.log(summary);
+  sendNotification(summary);
+
+  // limpiar resultados para el siguiente día
+  results = [];
+}
+
+// --- Loop cada 10 minutos para partidos ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos en vivo...");
-  fetchLiveEvents("football", "Fútbol");
-  fetchLiveEvents("basketball", "Básquet");
-  fetchLiveEvents("hockey", "Hockey");
+  console.log("🔄 Buscando partidos en vivo de básquet...");
+  fetchLiveBasketball();
 }, 10 * 60 * 1000);
+
+// --- Resumen al final del día (ejemplo: cada 24h) ---
+setInterval(() => {
+  console.log("📊 Generando resumen diario...");
+  summarizeResults();
+}, 24 * 60 * 60 * 1000);
+
 
