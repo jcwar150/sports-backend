@@ -1,4 +1,4 @@
-const http = require("https");
+const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
@@ -9,10 +9,10 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("⚽ Worker de partidos en vivo corriendo en Render"));
+app.get("/", (req, res) => res.send("⚽🏀🏒 Worker de deportes corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
-// --- Notificación OneSignal ---
+// --- Función para enviar notificación a OneSignal ---
 async function sendNotification(message) {
   try {
     const response = await axios.post(
@@ -35,7 +35,7 @@ async function sendNotification(message) {
   }
 }
 
-// --- Partidos en vivo ---
+// --- Función para obtener partidos en vivo ---
 function fetchLiveEvents(sportSlug, sportName) {
   const options = {
     method: "GET",
@@ -48,17 +48,15 @@ function fetchLiveEvents(sportSlug, sportName) {
     }
   };
 
-  const req = http.request(options, res => {
-    const chunks = [];
-    res.on("data", chunk => chunks.push(chunk));
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
     res.on("end", async () => {
       try {
-        const body = Buffer.concat(chunks);
-        const json = JSON.parse(body.toString());
+        const json = JSON.parse(data);
         const games = json.data || json.events || [];
         if (games.length > 0) {
-          let msg = `🏟️ Partidos en vivo de ${sportName}:\n`;
-          games.forEach(game => {
+          for (const game of games) {
             const home = game.homeTeam?.name;
             const away = game.awayTeam?.name;
             const homeScore = game.homeScore?.current ?? 0;
@@ -66,31 +64,42 @@ function fetchLiveEvents(sportSlug, sportName) {
             const league = game.uniqueTournament?.name || "Liga desconocida";
             const country = game.uniqueTournament?.category?.country?.name || "País desconocido";
             const status = game.status?.description || game.status?.type || "live";
-            const timer = game.status?.timer || "";
 
-            msg += `${home} ${homeScore} - ${awayScore} ${away} | ${league} (${country}) | ${status} ${timer}\n`;
-          });
-          console.log(msg);
-          await sendNotification(msg);
+            // Calcular minutos jugados
+            let minutesPlayed = "";
+            if (game.startTimestamp) {
+              const now = Math.floor(Date.now() / 1000);
+              const elapsed = Math.floor((now - game.startTimestamp) / 60);
+              minutesPlayed = `${elapsed}'`;
+            }
+
+            const message = `${sportName} - ${league} (${country})\n${home} ${homeScore} - ${awayScore} ${away} | ${status} ${minutesPlayed}`;
+            console.log("📊 Partido:", message); // Mostrar en consola
+            await sendNotification(message); // Enviar notificación
+          }
         } else {
-          console.log(`⚠️ No hay partidos en vivo de ${sportName}.`);
-          await sendNotification(`⚠️ No hay partidos en vivo de ${sportName}.`);
+          console.log(`⚠️ No se encontraron partidos en vivo de ${sportName}.`);
         }
       } catch (err) {
-        console.error("❌ Error parseando partidos:", err.message);
+        console.error("❌ Error parseando respuesta:", err.message);
       }
     });
   });
 
-  req.on("error", err => console.error("❌ Error en la petición partidos:", err.message));
+  req.on("error", err => console.error("❌ Error en la petición:", err.message));
   req.end();
 }
 
-// --- Loop cada 5 minutos ---
+// --- Loop cada 10 minutos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos en vivo...");
   fetchLiveEvents("football", "Fútbol");
   fetchLiveEvents("basketball", "Básquet");
   fetchLiveEvents("hockey", "Hockey");
 }, 10 * 60 * 1000);
+
+// --- Llamada inicial para probar inmediatamente ---
+fetchLiveEvents("football", "Fútbol");
+fetchLiveEvents("basketball", "Básquet");
+fetchLiveEvents("hockey", "Hockey");
 
