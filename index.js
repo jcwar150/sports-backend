@@ -54,13 +54,16 @@ function classifyBasketballGame(game) {
   const gameId = `${home}-${away}-${statusDesc}`;
 
   // --- Último cuarto desbalanceado ---
-  if (statusDesc.includes("4th quarter") && timer.startsWith("1'") && diff > 25) {
-    if (!notifiedGames.has(gameId)) {
-      const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos al inicio del último cuarto.`;
-      console.log(message);
-      sendNotification(message);
-      results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
-      notifiedGames.add(gameId);
+  if (statusDesc.includes("4th quarter")) {
+    const minute = parseInt(timer.replace("'", ""), 10);
+    if (!isNaN(minute) && minute <= 10 && diff > 25) {
+      if (!notifiedGames.has(gameId)) {
+        const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos en los primeros ${minute}' del último cuarto.`;
+        console.log(message);
+        sendNotification(message);
+        results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
+        notifiedGames.add(gameId);
+      }
     }
   }
 
@@ -127,11 +130,11 @@ function summarizeResults() {
   notifiedGames.clear();
 }
 
-// --- Loop cada 10 minutos para partidos ---
+// --- Loop cada 5 minutos para partidos ---
 setInterval(() => {
   console.log("🔄 Buscando partidos en vivo de básquet...");
   fetchLiveBasketball();
-}, 10 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 // --- Resumen al final del día (ejemplo: cada 24h) ---
 setInterval(() => {
