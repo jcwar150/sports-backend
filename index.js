@@ -134,7 +134,7 @@ function summarizeResults() {
 setInterval(() => {
   console.log("🔄 Buscando partidos en vivo de básquet...");
   fetchLiveBasketball();
-}, 5 * 60 * 1000);
+}, 3 * 60 * 1000);
 
 // --- Resumen al final del día (ejemplo: cada 24h) ---
 setInterval(() => {
