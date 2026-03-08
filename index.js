@@ -83,7 +83,7 @@ function getLiveBasketEvents() {
           const league = game.tournament?.name || "Liga desconocida";
           const country = game.tournament?.region?.name || "País desconocido";
           const status = game.status?.description || "";
-          const timer = game.status?.timer || "";
+          const timer = game.status?.timer || "sin dato";
           const pointsHome = game.homeScore?.current ?? 0;
           const pointsAway = game.awayScore?.current ?? 0;
           const diff = Math.abs(pointsHome - pointsAway);
@@ -98,8 +98,8 @@ function getLiveBasketEvents() {
             estimadoFinal: 0
           };
 
-          // --- Desbalanceado: último cuarto con timer ---
-          if (status.toUpperCase().includes("4TH") && diff >= 15 && !state.q4_blowout) {
+          // --- Desbalanceado: último cuarto con diferencia >= 22 ---
+          if (status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
             sendNotification(`⚡ Partido desbalanceado en Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
