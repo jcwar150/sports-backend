@@ -130,27 +130,53 @@ function summarizeResults() {
   notifiedGames.clear();
 }
 
-// --- Loop cada 5 minutos, solo entre 12h y 24h ---
+// --- Loop cada 5 minutos, solo entre 12h y 24h hora local (Ecuador) ---
 setInterval(() => {
   const now = new Date();
-  const hour = now.getHours(); // hora local del servidor
+  const hour = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Guayaquil",
+      hour: "numeric",
+      hour12: false
+    }).format(now),
+    10
+  );
+
   if (hour >= 12 && hour < 24) {
-    console.log("🔄 Buscando partidos en vivo de básquet...");
+    console.log(`🔄 [${hour}h] Buscando partidos en vivo de básquet...`);
     fetchLiveBasketball();
   } else {
-    console.log("⏸ Fuera de horario (12h-24h), no se hacen búsquedas.");
+    console.log(`⏸ [${hour}h] Fuera de horario (12h-24h Ecuador), no se hacen búsquedas.`);
   }
 }, 3 * 60 * 1000);
 
-// --- Resumen diario exactamente a medianoche ---
+// --- Resumen diario exactamente a medianoche hora local ---
 function scheduleMidnightSummary() {
   const now = new Date();
-  const msUntilMidnight =
-    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0) - now;
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Guayaquil",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(now);
+  const localHour = parseInt(parts.find(p => p.type === "hour").value, 10);
+  const localMinute = parseInt(parts.find(p => p.type === "minute").value, 10);
+  const localSecond = parseInt(parts.find(p => p.type === "second").value, 10);
+
+  const secondsUntilMidnight =
+    (24 - localHour - 1) * 3600 +
+    (60 - localMinute - 1) * 60 +
+    (60 - localSecond);
+
+  const msUntilMidnight = secondsUntilMidnight * 1000;
 
   setTimeout(() => {
     summarizeResults();
     scheduleMidnightSummary(); // reprogramar para la siguiente medianoche
   }, msUntilMidnight);
 }
+
 
