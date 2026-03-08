@@ -130,16 +130,27 @@ function summarizeResults() {
   notifiedGames.clear();
 }
 
-// --- Loop cada 5 minutos para partidos ---
+// --- Loop cada 5 minutos, solo entre 12h y 24h ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos en vivo de básquet...");
-  fetchLiveBasketball();
+  const now = new Date();
+  const hour = now.getHours(); // hora local del servidor
+  if (hour >= 12 && hour < 24) {
+    console.log("🔄 Buscando partidos en vivo de básquet...");
+    fetchLiveBasketball();
+  } else {
+    console.log("⏸ Fuera de horario (12h-24h), no se hacen búsquedas.");
+  }
 }, 3 * 60 * 1000);
 
-// --- Resumen al final del día (ejemplo: cada 24h) ---
-setInterval(() => {
-  console.log("📊 Generando resumen diario...");
-  summarizeResults();
-}, 24 * 60 * 60 * 1000);
+// --- Resumen diario exactamente a medianoche ---
+function scheduleMidnightSummary() {
+  const now = new Date();
+  const msUntilMidnight =
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0) - now;
 
+  setTimeout(() => {
+    summarizeResults();
+    scheduleMidnightSummary(); // reprogramar para la siguiente medianoche
+  }, msUntilMidnight);
+}
 
