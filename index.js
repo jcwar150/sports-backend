@@ -9,10 +9,31 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("🏀 Worker de básquet corriendo en Render"));
+let notifiedGames = new Map();
+let currentDate = new Date().toISOString().split("T")[0];
+
+let dailyStats = {
+  overtime: { won: 0, lost: 0 },
+  blowout: { won: 0, lost: 0 },
+  total: { won: 0, lost: 0 }
+};
+
+function resetDailyGamesIfNeeded() {
+  const today = new Date().toISOString().split("T")[0];
+  if (today !== currentDate) {
+    dailyStats = {
+      overtime: { won: 0, lost: 0 },
+      blowout: { won: 0, lost: 0 },
+      total: { won: 0, lost: 0 }
+    };
+    notifiedGames.clear();
+    currentDate = today;
+  }
+}
+
+app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 
-// --- Notificación OneSignal ---
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -20,6 +41,7 @@ async function sendNotification(message) {
       {
         app_id: ONESIGNAL_APP_ID,
         included_segments: ["All"],
+        headings: { en: "🏀 Basket Alert" },
         contents: { en: message }
       },
       {
@@ -35,64 +57,12 @@ async function sendNotification(message) {
   }
 }
 
-// --- Arrays globales ---
-let results = [];
-let notifiedGames = new Set();
+function getLiveBasketEvents() {
+  resetDailyGamesIfNeeded();
 
-// --- Hora local Ecuador ---
-function getLocalTime() {
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Guayaquil",
-    hour: "numeric",
-    hour12: false
-  });
-  const parts = formatter.formatToParts(now);
-  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
-  const day = now.getDay(); // 0 = domingo, 6 = sábado
-  return { hour, day };
-}
-
-// --- Clasificación de partidos ---
-function classifyBasketballGame(game) {
-  const home = game.homeTeam?.name;
-  const away = game.awayTeam?.name;
-  const homeScore = game.homeScore?.current ?? 0;
-  const awayScore = game.awayScore?.current ?? 0;
-  const diff = Math.abs(homeScore - awayScore);
-
-  const statusDesc = game.status?.description || "";
-  const gameId = `${home}-${away}-${statusDesc}`;
-
-  // --- Último cuarto desbalanceado (sin restricción de tiempo) ---
-  if (statusDesc.includes("4th quarter") && diff > 15) {
-    if (!notifiedGames.has(gameId)) {
-      const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos en el último cuarto.`;
-      console.log(message);
-      sendNotification(message);
-      results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
-      notifiedGames.add(gameId);
-    }
-  }
-
-  // --- Prórroga ---
-  if (statusDesc.includes("OT")) {
-    if (!notifiedGames.has(gameId)) {
-      const message = `🏀 Partido en prórroga!\n${home} ${homeScore} - ${awayScore} ${away}`;
-      console.log(message);
-      sendNotification(message);
-      results.push({ type: "prorroga", diff, win: homeScore > awayScore });
-      notifiedGames.add(gameId);
-    }
-  }
-}
-
-// --- Obtener partidos en vivo ---
-function fetchLiveBasketball() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
-    port: null,
     path: `/api/v1/sport/basketball/events/live`,
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
@@ -107,87 +77,133 @@ function fetchLiveBasketball() {
       try {
         const json = JSON.parse(data);
         const games = json.data || json.events || [];
-        if (games.length > 0) {
-          games.forEach(game => classifyBasketballGame(game));
-        } else {
-          console.log("⚠️ No se encontraron partidos en vivo de básquet.");
-        }
+        games.forEach(game => {
+          const home = game.homeTeam?.name;
+          const away = game.awayTeam?.name;
+          const status = game.status?.description || "";
+          const timer = game.status?.timer || "";
+          const pointsHome = game.homeScore?.current ?? 0;
+          const pointsAway = game.awayScore?.current ?? 0;
+          const diff = Math.abs(pointsHome - pointsAway);
+          const key = `${home} vs ${away}`;
+
+          let state = notifiedGames.get(key) || {
+            q4_blowout: false,
+            ot: false,
+            otFinal: false,
+            final: false,
+            initialTotal: 0,
+            estimadoFinal: 0
+          };
+
+          // --- Desbalanceado: último cuarto ---
+          if (status.toUpperCase().includes("4TH") && diff >= 15 && !state.q4_blowout) {
+            const totalPointsQ3 = pointsHome + pointsAway; // aproximado
+            const promedioQ = totalPointsQ3 / 3;
+            const estimadoFinal = totalPointsQ3 + promedioQ;
+
+            sendNotification(`⚡ Partido desbalanceado en Q4
+${home} vs ${away}
+🏀 ${pointsHome} - ${pointsAway}
+⏱️ Tiempo: ${timer}
+📊 Total puntos hasta Q3: ${totalPointsQ3}
+💡 Estimado final: ${estimadoFinal.toFixed(0)} puntos`);
+
+            state.q4_blowout = true;
+            state.initialTotal = totalPointsQ3;
+            state.estimadoFinal = estimadoFinal;
+            notifiedGames.set(key, state);
+          }
+
+          // --- Prórroga ---
+          if ((status.toUpperCase().includes("OT")) && !state.ot && !state.final) {
+            const totalPoints = pointsHome + pointsAway;
+            const suggestion = totalPoints + 26;
+
+            sendNotification(`⏱️ Prórroga detectada
+${home} vs ${away}
+🏀 ${pointsHome} - ${pointsAway}
+📊 Total puntos: ${totalPoints}
+💡 Sugerencia: Menos de ${suggestion}`);
+
+            state.ot = true;
+            state.initialTotal = totalPoints;
+            notifiedGames.set(key, state);
+          }
+
+          // --- Evaluación final ---
+          if (status.toUpperCase().includes("FT") && !state.final) {
+            if (state.q4_blowout || state.ot) {
+              const totalPoints = pointsHome + pointsAway;
+              const outcomes = [];
+
+              if (state.q4_blowout) {
+                const estimadoFinal = state.estimadoFinal || 0;
+                const blowoutWin = totalPoints <= estimadoFinal;
+                outcomes.push({ label: "Desbalanceado", win: blowoutWin });
+                if (blowoutWin) { dailyStats.blowout.won++; dailyStats.total.won++; }
+                else { dailyStats.blowout.lost++; dailyStats.total.lost++; }
+              }
+
+              if (state.ot && !state.otFinal) {
+                const overtimeWin = totalPoints <= state.initialTotal + 26;
+                outcomes.push({ label: "Prórroga", win: overtimeWin });
+                if (overtimeWin) { dailyStats.overtime.won++; dailyStats.total.won++; }
+                else { dailyStats.overtime.lost++; dailyStats.total.lost++; }
+                state.otFinal = true;
+              }
+
+              const overallWin = outcomes.some(o => o.win);
+              const resultText = overallWin ? "Ganaste" : "Perdiste";
+              const breakdown = outcomes.map(o => `• ${o.label}: ${o.win ? "Ganaste" : "Perdiste"}`).join("\n");
+
+              sendNotification(`✅ Partido terminado: ${home} vs ${away}
+🏀 Resultado final: ${pointsHome} - ${pointsAway}
+📊 Total puntos: ${totalPoints}
+🎯 Resultado general: ${resultText}
+${breakdown}`);
+            }
+            state.final = true;
+            notifiedGames.set(key, state);
+          }
+        });
       } catch (err) {
-        console.error("❌ Error parseando respuesta:", err.message);
+        console.error("❌ Error parseando respuesta basket:", err.message);
       }
     });
   });
 
-  req.on("error", err => console.error("❌ Error en la petición:", err.message));
+  req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
 
-// --- Resumen al final del día ---
-function summarizeResults() {
-  const total = results.length;
-  const wins = results.filter(r => r.win).length;
-  const losses = total - wins;
-  const avg = total > 0 ? (wins / total * 100).toFixed(2) : 0;
+// --- Loop cada 15 segundos ---
+setInterval(() => {
+  console.log("🔄 Buscando partidos de basket...");
+  getLiveBasketEvents();
+}, 180 * 1000);
 
-  const summary = `📊 Resumen del día:\nTotal partidos: ${total}\nGanados: ${wins}\nPerdidos: ${losses}\nPromedio de éxito: ${avg}%`;
-  console.log(summary);
-  sendNotification(summary);
+// --- Resumen diario a las 23:59 ---
+function sendDailySummary() {
+  const calcPercent = (won, lost) => {
+    const total = won + lost;
+    return total === 0 ? "0%" : ((won / total) * 100).toFixed(1) + "%";
+  };
 
-  results = [];
+  const msg = `📊 Resumen del día (${currentDate})
+- Prórroga: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
+- Desbalanceados: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
+- General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
+
+  sendNotification(msg);
+  dailyStats = { overtime: { won: 0, lost: 0 }, blowout: { won: 0, lost: 0 }, total: { won: 0, lost: 0 } };
   notifiedGames.clear();
 }
 
-// --- Loop cada 5 minutos con horarios diferenciados ---
 setInterval(() => {
-  const { hour, day } = getLocalTime();
-
-  let startHour = 12;
-  let endHour = 24;
-
-  // Si es sábado (6) o domingo (0), usar 9h-22h
-  if (day === 0 || day === 6) {
-    startHour = 9;
-    endHour = 22;
-  }
-
-  if (hour >= startHour && hour < endHour) {
-    console.log(`🔄 [${hour}h Ecuador] Buscando partidos en vivo de básquet...`);
-    fetchLiveBasketball();
-  } else {
-    console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
-  }
-  sendNotification("🚀 Prueba de notificación desde el backend");
-
-}, 5 * 60 * 1000);
-
-// --- Resumen diario exactamente a medianoche hora local ---
-function scheduleMidnightSummary() {
   const now = new Date();
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Guayaquil",
-    hour: "numeric",
-    minute: "numeric",
-    second: "numeric",
-    hour12: false
-  });
+  if (now.getHours() === 23 && now.getMinutes() === 59) {
 
-  const parts = formatter.formatToParts(now);
-  const localHour = parseInt(parts.find(p => p.type === "hour").value, 10);
-  const localMinute = parseInt(parts.find(p => p.type === "minute").value, 10);
-  const localSecond = parseInt(parts.find(p => p.type === "second").value, 10);
-
-  const secondsUntilMidnight =
-    (24 - localHour - 1) * 3600 +
-    (60 - localMinute - 1) * 60 +
-    (60 - localSecond);
-
-  const msUntilMidnight = secondsUntilMidnight * 1000;
-
-  setTimeout(() => {
-    summarizeResults();
-    scheduleMidnightSummary(); // reprogramar para la siguiente medianoche
-  }, msUntilMidnight);
-}
 
 
 
