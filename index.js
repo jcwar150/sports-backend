@@ -40,16 +40,19 @@ let results = [];
 let notifiedGames = new Set();
 
 // --- Hora local Ecuador ---
-function getLocalHour() {
+function getLocalTime() {
   const now = new Date();
-  return parseInt(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Guayaquil",
-      hour: "numeric",
-      hour12: false
-    }).format(now),
-    10
-  );
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Guayaquil",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
+  const minute = parseInt(parts.find(p => p.type === "minute").value, 10);
+  const day = now.getDay(); // 0 = domingo, 6 = sábado
+  return { hour, minute, day };
 }
 
 // --- Clasificación de partidos ---
@@ -64,11 +67,12 @@ function classifyBasketballGame(game) {
   const timer = game.status?.timer || "";
   const gameId = `${home}-${away}-${statusDesc}`;
 
+  // --- Último cuarto desbalanceado ---
   if (statusDesc.includes("4th quarter")) {
     const minute = parseInt(timer.replace("'", ""), 10);
-    if (!isNaN(minute) && minute <= 10 && diff > 25) {
+    if (!isNaN(minute) && minute >= 1 && minute <= 25 && diff > 15) {
       if (!notifiedGames.has(gameId)) {
-        const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos en los primeros ${minute}' del último cuarto.`;
+        const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos en el último cuarto (min ${minute}').`;
         console.log(message);
         sendNotification(message);
         results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
@@ -77,6 +81,7 @@ function classifyBasketballGame(game) {
     }
   }
 
+  // --- Prórroga ---
   if (statusDesc.includes("OT")) {
     if (!notifiedGames.has(gameId)) {
       const message = `🏀 Partido en prórroga!\n${home} ${homeScore} - ${awayScore} ${away}`;
@@ -138,14 +143,24 @@ function summarizeResults() {
   notifiedGames.clear();
 }
 
-// --- Loop cada 5 minutos, solo entre 12h y 24h hora local (Ecuador) ---
+// --- Loop cada 5 minutos con horarios diferenciados ---
 setInterval(() => {
-  const hour = getLocalHour();
-  if (hour >= 12 && hour < 24) {
+  const { hour, day } = getLocalTime();
+
+  let startHour = 12;
+  let endHour = 24;
+
+  // Si es sábado (6) o domingo (0), usar 9h-22h
+  if (day === 0 || day === 6) {
+    startHour = 9;
+    endHour = 22;
+  }
+
+  if (hour >= startHour && hour < endHour) {
     console.log(`🔄 [${hour}h Ecuador] Buscando partidos en vivo de básquet...`);
     fetchLiveBasketball();
   } else {
-    console.log(`⏸ [${hour}h Ecuador] Fuera de horario (12h-24h), no se hacen búsquedas.`);
+    console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
   }
 }, 5 * 60 * 1000);
 
@@ -177,6 +192,7 @@ function scheduleMidnightSummary() {
     scheduleMidnightSummary(); // reprogramar para la siguiente medianoche
   }, msUntilMidnight);
 }
+
 
 
 
