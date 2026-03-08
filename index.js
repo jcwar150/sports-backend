@@ -177,10 +177,39 @@ ${breakdown}`);
   req.end();
 }
 
-// --- Loop cada 15 segundos ---
+// --- Hora local Ecuador ---
+function getLocalTime() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Guayaquil",
+    hour: "numeric",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
+  const day = now.getDay(); // 0 = domingo, 6 = sábado
+  return { hour, day };
+}
+
+// --- Loop cada 15 segundos con horarios diferenciados ---
 setInterval(() => {
-  console.log("🔄 Buscando partidos de basket...");
-  getLiveBasketEvents();
+  const { hour, day } = getLocalTime();
+
+  let startHour = 12;
+  let endHour = 24;
+
+  // Si es sábado (6) o domingo (0), usar 9h-22h
+  if (day === 0 || day === 6) {
+    startHour = 9;
+    endHour = 22;
+  }
+
+  if (hour >= startHour && hour < endHour) {
+    console.log(`🔄 [${hour}h Ecuador] Buscando partidos de basket...`);
+    getLiveBasketEvents();
+  } else {
+    console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
+  }
 }, 180 * 1000);
 
 // --- Resumen diario a las 23:59 ---
@@ -196,14 +225,25 @@ function sendDailySummary() {
 - General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
 
   sendNotification(msg);
-  dailyStats = { overtime: { won: 0, lost: 0 }, blowout: { won: 0, lost: 0 }, total: { won: 0, lost: 0 } };
+
+  // Resetear estadísticas
+  dailyStats = {
+    overtime: { won: 0, lost: 0 },
+    blowout: { won: 0, lost: 0 },
+    total: { won: 0, lost: 0 }
+  };
+
+  // Limpiar partidos finalizados
   notifiedGames.clear();
 }
 
+// --- Loop para enviar resumen a las 23:59 ---
 setInterval(() => {
   const now = new Date();
   if (now.getHours() === 23 && now.getMinutes() === 59) {
-
+    sendDailySummary();
+  }
+}, 60 * 1000);
 
 
 
