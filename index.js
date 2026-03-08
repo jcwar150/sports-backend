@@ -2,7 +2,7 @@ const https = require("https");
 const axios = require("axios");
 const express = require("express");
 
-const API_SPORT_KEY = process.env.FOOTBALL_API_KEY; // clave única para todos los deportes
+const API_SPORT_KEY = process.env.FOOTBALL_API_KEY;
 const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID;
 const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 
@@ -15,7 +15,7 @@ app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 // --- Notificación OneSignal ---
 async function sendNotification(message) {
   try {
-    const response = await axios.post(
+    await axios.post(
       "https://api.onesignal.com/notifications",
       {
         app_id: ONESIGNAL_APP_ID,
@@ -29,7 +29,7 @@ async function sendNotification(message) {
         }
       }
     );
-    console.log("📲 Notificación enviada:", response.data);
+    console.log("📲 Notificación enviada:", message);
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
@@ -37,7 +37,20 @@ async function sendNotification(message) {
 
 // --- Arrays globales ---
 let results = [];
-let notifiedGames = new Set(); // para evitar notificaciones repetidas
+let notifiedGames = new Set();
+
+// --- Hora local Ecuador ---
+function getLocalHour() {
+  const now = new Date();
+  return parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Guayaquil",
+      hour: "numeric",
+      hour12: false
+    }).format(now),
+    10
+  );
+}
 
 // --- Clasificación de partidos ---
 function classifyBasketballGame(game) {
@@ -49,11 +62,8 @@ function classifyBasketballGame(game) {
 
   const statusDesc = game.status?.description || "";
   const timer = game.status?.timer || "";
-
-  // ID único del partido para evitar duplicados
   const gameId = `${home}-${away}-${statusDesc}`;
 
-  // --- Último cuarto desbalanceado ---
   if (statusDesc.includes("4th quarter")) {
     const minute = parseInt(timer.replace("'", ""), 10);
     if (!isNaN(minute) && minute <= 10 && diff > 25) {
@@ -67,7 +77,6 @@ function classifyBasketballGame(game) {
     }
   }
 
-  // --- Prórroga ---
   if (statusDesc.includes("OT")) {
     if (!notifiedGames.has(gameId)) {
       const message = `🏀 Partido en prórroga!\n${home} ${homeScore} - ${awayScore} ${away}`;
@@ -125,30 +134,20 @@ function summarizeResults() {
   console.log(summary);
   sendNotification(summary);
 
-  // limpiar resultados y notificaciones para el siguiente día
   results = [];
   notifiedGames.clear();
 }
 
 // --- Loop cada 5 minutos, solo entre 12h y 24h hora local (Ecuador) ---
 setInterval(() => {
-  const now = new Date();
-  const hour = parseInt(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Guayaquil",
-      hour: "numeric",
-      hour12: false
-    }).format(now),
-    10
-  );
-
+  const hour = getLocalHour();
   if (hour >= 12 && hour < 24) {
-    console.log(`🔄 [${hour}h] Buscando partidos en vivo de básquet...`);
+    console.log(`🔄 [${hour}h Ecuador] Buscando partidos en vivo de básquet...`);
     fetchLiveBasketball();
   } else {
-    console.log(`⏸ [${hour}h] Fuera de horario (12h-24h Ecuador), no se hacen búsquedas.`);
+    console.log(`⏸ [${hour}h Ecuador] Fuera de horario (12h-24h), no se hacen búsquedas.`);
   }
-}, 3 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 // --- Resumen diario exactamente a medianoche hora local ---
 function scheduleMidnightSummary() {
@@ -178,5 +177,6 @@ function scheduleMidnightSummary() {
     scheduleMidnightSummary(); // reprogramar para la siguiente medianoche
   }, msUntilMidnight);
 }
+
 
 
