@@ -156,6 +156,8 @@ setInterval(() => {
   } else {
     console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
   }
+  sendNotification("🚀 Prueba de notificación desde el backend");
+
 }, 5 * 60 * 1000);
 
 // --- Resumen diario exactamente a medianoche hora local ---
