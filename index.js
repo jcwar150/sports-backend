@@ -45,14 +45,12 @@ function getLocalTime() {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Guayaquil",
     hour: "numeric",
-    minute: "numeric",
     hour12: false
   });
   const parts = formatter.formatToParts(now);
   const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
-  const minute = parseInt(parts.find(p => p.type === "minute").value, 10);
   const day = now.getDay(); // 0 = domingo, 6 = sábado
-  return { hour, minute, day };
+  return { hour, day };
 }
 
 // --- Clasificación de partidos ---
@@ -64,20 +62,16 @@ function classifyBasketballGame(game) {
   const diff = Math.abs(homeScore - awayScore);
 
   const statusDesc = game.status?.description || "";
-  const timer = game.status?.timer || "";
   const gameId = `${home}-${away}-${statusDesc}`;
 
-  // --- Último cuarto desbalanceado ---
-  if (statusDesc.includes("4th quarter")) {
-    const minute = parseInt(timer.replace("'", ""), 10);
-    if (!isNaN(minute) && minute >= 1 && minute <= 25 && diff > 15) {
-      if (!notifiedGames.has(gameId)) {
-        const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos en el último cuarto (min ${minute}').`;
-        console.log(message);
-        sendNotification(message);
-        results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
-        notifiedGames.add(gameId);
-      }
+  // --- Último cuarto desbalanceado (sin restricción de tiempo) ---
+  if (statusDesc.includes("4th quarter") && diff > 15) {
+    if (!notifiedGames.has(gameId)) {
+      const message = `🏀 Partido desbalanceado!\n${home} ${homeScore} - ${awayScore} ${away}\nDiferencia: ${diff} puntos en el último cuarto.`;
+      console.log(message);
+      sendNotification(message);
+      results.push({ type: "desbalanceado", diff, win: homeScore > awayScore });
+      notifiedGames.add(gameId);
     }
   }
 
@@ -192,7 +186,6 @@ function scheduleMidnightSummary() {
     scheduleMidnightSummary(); // reprogramar para la siguiente medianoche
   }, msUntilMidnight);
 }
-
 
 
 
