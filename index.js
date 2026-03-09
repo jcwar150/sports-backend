@@ -98,46 +98,50 @@ function getLiveBasketEvents() {
             estimadoFinal: 0
           };
 
-          // --- Desbalanceado: último cuarto con diferencia >= 22 ---
-          console.log("DEBUG Q4:", status, "Timer:", timer);
-          if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
-            sendNotification(`⚡ Partido desbalanceado en Q4
+         // --- Desbalanceado: último cuarto con diferencia >= 22 ---
+const timer = game.status?.timer || "sin dato";
+console.log("DEBUG Q4:", status, "Timer:", timer, "Liga:", league, "País:", country);
+
+if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
+  sendNotification(`⚡ Partido desbalanceado en Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 ⏱️ Tiempo: ${timer}
 📊 Diferencia: ${diff} puntos`);
 
-            state.q4_blowout = true;
-            notifiedGames.set(key, state);
-          }
+  state.q4_blowout = true;
+  notifiedGames.set(key, state);
+}
 
-          // --- Prórroga: condición flexible ---
-          console.log("DEBUG OT:", status);
-          if (
-            status &&
-            (
-              status.toUpperCase().includes("OT") ||
-              status.toUpperCase().includes("OVERTIME") ||
-              status.toUpperCase().includes("ET") ||
-              status.toUpperCase().includes("EXTRA")
-            ) &&
-            !state.ot && !state.final
-          ) {
-            const totalPoints = pointsHome + pointsAway;
-            const suggestion = totalPoints + 26;
+// --- Prórroga: condición flexible ---
+console.log("DEBUG OT:", status, "Liga:", league, "País:", country);
 
-            sendNotification(`⏱️ Prórroga detectada
+if (
+  status &&
+  (
+    status.toUpperCase().includes("OT") ||
+    status.toUpperCase().includes("OVERTIME") ||
+    status.toUpperCase().includes("ET") ||
+    status.toUpperCase().includes("EXTRA")
+  ) &&
+  !state.ot && !state.final
+) {
+  const totalPoints = pointsHome + pointsAway;
+  const suggestion = totalPoints + 26;
+
+  sendNotification(`⏱️ Prórroga detectada
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
-            state.ot = true;
-            state.initialTotal = totalPoints;
-            notifiedGames.set(key, state);
-          }
+  state.ot = true;
+  state.initialTotal = totalPoints;
+  notifiedGames.set(key, state);
+}
+
 
           // --- Evaluación final ---
           if (status.toUpperCase().includes("FT") && !state.final) {
