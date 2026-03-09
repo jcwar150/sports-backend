@@ -99,7 +99,8 @@ function getLiveBasketEvents() {
           };
 
           // --- Desbalanceado: último cuarto con diferencia >= 22 ---
-          if (status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
+          console.log("DEBUG Q4:", status, "Timer:", timer);
+          if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
             sendNotification(`⚡ Partido desbalanceado en Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
@@ -111,8 +112,18 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);
           }
 
-          // --- Prórroga ---
-          if ((status.toUpperCase().includes("OT")) && !state.ot && !state.final) {
+          // --- Prórroga: condición flexible ---
+          console.log("DEBUG OT:", status);
+          if (
+            status &&
+            (
+              status.toUpperCase().includes("OT") ||
+              status.toUpperCase().includes("OVERTIME") ||
+              status.toUpperCase().includes("ET") ||
+              status.toUpperCase().includes("EXTRA")
+            ) &&
+            !state.ot && !state.final
+          ) {
             const totalPoints = pointsHome + pointsAway;
             const suggestion = totalPoints + 26;
 
