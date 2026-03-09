@@ -9,8 +9,6 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
-app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 let notifiedGames = new Map();
 let currentDate = new Date().toISOString().split("T")[0];
 
@@ -32,6 +30,10 @@ function resetDailyGamesIfNeeded() {
     currentDate = today;
   }
 }
+
+app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
+app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
+
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -54,6 +56,7 @@ async function sendNotification(message) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
+
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
 
@@ -99,21 +102,20 @@ function getLiveBasketEvents() {
             estimadoFinal: 0
           };
 
-          // --- Desbalanceado ---
-          console.log("DEBUG Q4:", status, "Timer:", timerVal, "Liga:", league, "País:", country);
+          // --- Desbalanceado: último cuarto con diferencia >= 22 ---
           if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
             sendNotification(`⚡ Partido desbalanceado en Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
-⏱️ Tiempo: ${timerVal}
+⏱️ Tiempo: ${status} (${timerVal})
 📊 Diferencia: ${diff} puntos`);
+
             state.q4_blowout = true;
             notifiedGames.set(key, state);
           }
 
-          // --- Prórroga ---
-          console.log("DEBUG OT:", status, "Liga:", league, "País:", country);
+          // --- Prórroga: condición flexible ---
           if (
             status &&
             (
@@ -131,6 +133,7 @@ Liga: ${league} | País: ${country}
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
+⏱️ Tiempo: ${status} (${timerVal})
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
@@ -184,6 +187,8 @@ ${breakdown}`);
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
+
+// --- Hora local Ecuador ---
 function getLocalTime() {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -197,6 +202,7 @@ function getLocalTime() {
   return { hour, day };
 }
 
+// --- Loop cada 15 segundos con horarios diferenciados ---
 setInterval(() => {
   const { hour, day } = getLocalTime();
 
@@ -215,6 +221,7 @@ setInterval(() => {
     console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
   }
 }, 180 * 1000);
+
 // --- Resumen diario a las 23:59 ---
 function sendDailySummary() {
   const calcPercent = (won, lost) => {
