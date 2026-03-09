@@ -102,18 +102,34 @@ function getLiveBasketEvents() {
             estimadoFinal: 0
           };
 
-          // --- Desbalanceado: último cuarto con diferencia >= 22 ---
-          if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
-            sendNotification(`⚡ Partido desbalanceado en Q4
+         // --- Desbalanceado: último cuarto con diferencia >= 22 ---
+if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
+  const totalPoints = pointsHome + pointsAway;
+
+  // Puntos de los 3 cuartos anteriores
+  const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
+  const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
+  const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
+
+  // Promedio de los 3 cuartos
+  const avgPrevQuarters = (q1 + q2 + q3) / 3;
+
+  // Sugerido = total actual + promedio
+  const suggestion = totalPoints + avgPrevQuarters;
+
+  sendNotification(`⚡ Partido desbalanceado en Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 ⏱️ Tiempo: ${status} (${timerVal})
-📊 Diferencia: ${diff} puntos`);
+📊 Diferencia: ${diff} puntos
+💡 Sugerencia: Menos de ${Math.round(suggestion)}`);
 
-            state.q4_blowout = true;
-            notifiedGames.set(key, state);
-          }
+  state.q4_blowout = true;
+  state.initialTotal = totalPoints;
+  notifiedGames.set(key, state);
+}
+
 
           // --- Prórroga: condición flexible ---
           if (
