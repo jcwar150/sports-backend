@@ -9,6 +9,8 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
+app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 let notifiedGames = new Map();
 let currentDate = new Date().toISOString().split("T")[0];
 
@@ -30,10 +32,6 @@ function resetDailyGamesIfNeeded() {
     currentDate = today;
   }
 }
-
-app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
-app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
-
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -56,7 +54,6 @@ async function sendNotification(message) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
-
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
 
@@ -81,9 +78,13 @@ function getLiveBasketEvents() {
           const home = game.homeTeam?.name;
           const away = game.awayTeam?.name;
           const league = game.tournament?.name || "Liga desconocida";
-          const country = game.tournament?.region?.name || "País desconocido";
+          const country =
+            game.tournament?.region?.name ||
+            game.tournament?.category?.name ||
+            game.tournament?.country?.name ||
+            "País desconocido";
           const status = game.status?.description || "";
-          const timer = game.status?.timer || "sin dato";
+          const timerVal = game.status?.timer || "sin dato";
           const pointsHome = game.homeScore?.current ?? 0;
           const pointsAway = game.awayScore?.current ?? 0;
           const diff = Math.abs(pointsHome - pointsAway);
@@ -98,50 +99,45 @@ function getLiveBasketEvents() {
             estimadoFinal: 0
           };
 
-         // --- Desbalanceado: último cuarto con diferencia >= 22 ---
-const timer = game.status?.timer || "sin dato";
-console.log("DEBUG Q4:", status, "Timer:", timer, "Liga:", league, "País:", country);
-
-if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
-  sendNotification(`⚡ Partido desbalanceado en Q4
+          // --- Desbalanceado ---
+          console.log("DEBUG Q4:", status, "Timer:", timerVal, "Liga:", league, "País:", country);
+          if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
+            sendNotification(`⚡ Partido desbalanceado en Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
-⏱️ Tiempo: ${timer}
+⏱️ Tiempo: ${timerVal}
 📊 Diferencia: ${diff} puntos`);
+            state.q4_blowout = true;
+            notifiedGames.set(key, state);
+          }
 
-  state.q4_blowout = true;
-  notifiedGames.set(key, state);
-}
+          // --- Prórroga ---
+          console.log("DEBUG OT:", status, "Liga:", league, "País:", country);
+          if (
+            status &&
+            (
+              status.toUpperCase().includes("OT") ||
+              status.toUpperCase().includes("OVERTIME") ||
+              status.toUpperCase().includes("ET") ||
+              status.toUpperCase().includes("EXTRA")
+            ) &&
+            !state.ot && !state.final
+          ) {
+            const totalPoints = pointsHome + pointsAway;
+            const suggestion = totalPoints + 26;
 
-// --- Prórroga: condición flexible ---
-console.log("DEBUG OT:", status, "Liga:", league, "País:", country);
-
-if (
-  status &&
-  (
-    status.toUpperCase().includes("OT") ||
-    status.toUpperCase().includes("OVERTIME") ||
-    status.toUpperCase().includes("ET") ||
-    status.toUpperCase().includes("EXTRA")
-  ) &&
-  !state.ot && !state.final
-) {
-  const totalPoints = pointsHome + pointsAway;
-  const suggestion = totalPoints + 26;
-
-  sendNotification(`⏱️ Prórroga detectada
+            sendNotification(`⏱️ Prórroga detectada
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total puntos: ${totalPoints}
 💡 Sugerencia: Menos de ${suggestion}`);
 
-  state.ot = true;
-  state.initialTotal = totalPoints;
-  notifiedGames.set(key, state);
-}
-
+            state.ot = true;
+            state.initialTotal = totalPoints;
+            notifiedGames.set(key, state);
+          }
 
           // --- Evaluación final ---
           if (status.toUpperCase().includes("FT") && !state.final) {
@@ -188,8 +184,6 @@ ${breakdown}`);
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-
-// --- Hora local Ecuador ---
 function getLocalTime() {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -203,14 +197,12 @@ function getLocalTime() {
   return { hour, day };
 }
 
-// --- Loop cada 15 segundos con horarios diferenciados ---
 setInterval(() => {
   const { hour, day } = getLocalTime();
 
   let startHour = 12;
   let endHour = 24;
 
-  // Si es sábado (6) o domingo (0), usar 9h-22h
   if (day === 0 || day === 6) {
     startHour = 9;
     endHour = 22;
@@ -223,8 +215,6 @@ setInterval(() => {
     console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
   }
 }, 180 * 1000);
-
-
 // --- Resumen diario a las 23:59 ---
 function sendDailySummary() {
   const calcPercent = (won, lost) => {
@@ -239,14 +229,12 @@ function sendDailySummary() {
 
   sendNotification(msg);
 
-  // Resetear estadísticas
+  // Resetear estadísticas y limpiar partidos
   dailyStats = {
     overtime: { won: 0, lost: 0 },
     blowout: { won: 0, lost: 0 },
     total: { won: 0, lost: 0 }
   };
-
-  // Limpiar partidos finalizados
   notifiedGames.clear();
 }
 
@@ -257,6 +245,7 @@ setInterval(() => {
     sendDailySummary();
   }
 }, 60 * 1000);
+
 
 
 
