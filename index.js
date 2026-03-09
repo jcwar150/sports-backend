@@ -9,6 +9,8 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
+app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 let notifiedGames = new Map();
 let currentDate = new Date().toISOString().split("T")[0];
 
@@ -30,10 +32,6 @@ function resetDailyGamesIfNeeded() {
     currentDate = today;
   }
 }
-
-app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
-app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
-
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -56,7 +54,6 @@ async function sendNotification(message) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
-
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
 
@@ -98,26 +95,19 @@ function getLiveBasketEvents() {
             ot: false,
             otFinal: false,
             final: false,
-            initialTotal: 0,
-            estimadoFinal: 0
+            initialTotal: 0
           };
 
-         // --- Desbalanceado: último cuarto con diferencia >= 22 ---
-if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
-  const totalPoints = pointsHome + pointsAway;
+          // --- Desbalanceado ---
+          if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
+            const totalPoints = pointsHome + pointsAway;
+            const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
+            const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
+            const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
+            const avgPrevQuarters = (q1 + q2 + q3) / 3;
+            const suggestion = totalPoints + avgPrevQuarters;
 
-  // Puntos de los 3 cuartos anteriores
-  const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
-  const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
-  const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
-
-  // Promedio de los 3 cuartos
-  const avgPrevQuarters = (q1 + q2 + q3) / 3;
-
-  // Sugerido = total actual + promedio
-  const suggestion = totalPoints + avgPrevQuarters;
-
-  sendNotification(`⚡ Partido desbalanceado en Q4
+            sendNotification(`⚡ Partido desbalanceado en Q4
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -125,13 +115,12 @@ Liga: ${league} | País: ${country}
 📊 Diferencia: ${diff} puntos
 💡 Sugerencia: Menos de ${Math.round(suggestion)}`);
 
-  state.q4_blowout = true;
-  state.initialTotal = totalPoints;
-  notifiedGames.set(key, state);
-}
+            state.q4_blowout = true;
+            state.initialTotal = totalPoints;
+            notifiedGames.set(key, state);
+          }
 
-
-          // --- Prórroga: condición flexible ---
+          // --- Prórroga ---
           if (
             status &&
             (
@@ -143,7 +132,12 @@ Liga: ${league} | País: ${country}
             !state.ot && !state.final
           ) {
             const totalPoints = pointsHome + pointsAway;
-            const suggestion = totalPoints + 26;
+            const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
+            const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
+            const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
+            const q4 = (game.homeScore?.period4 ?? 0) + (game.awayScore?.period4 ?? 0);
+            const avgPrevQuarters = (q1 + q2 + q3 + q4) / 4;
+            const suggestion = totalPoints + avgPrevQuarters;
 
             sendNotification(`⏱️ Prórroga detectada
 ${home} vs ${away}
@@ -151,7 +145,7 @@ Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 ⏱️ Tiempo: ${status} (${timerVal})
 📊 Total puntos: ${totalPoints}
-💡 Sugerencia: Menos de ${suggestion}`);
+💡 Sugerencia: Menos de ${Math.round(suggestion)}`);
 
             state.ot = true;
             state.initialTotal = totalPoints;
@@ -160,36 +154,6 @@ Liga: ${league} | País: ${country}
 
           // --- Evaluación final ---
           if (status.toUpperCase().includes("FT") && !state.final) {
-            if (state.q4_blowout || state.ot) {
-              const totalPoints = pointsHome + pointsAway;
-              const outcomes = [];
-
-              if (state.q4_blowout) {
-                const blowoutWin = totalPoints <= (pointsHome + pointsAway);
-                outcomes.push({ label: "Desbalanceado", win: blowoutWin });
-                if (blowoutWin) { dailyStats.blowout.won++; dailyStats.total.won++; }
-                else { dailyStats.blowout.lost++; dailyStats.total.lost++; }
-              }
-
-              if (state.ot && !state.otFinal) {
-                const overtimeWin = totalPoints <= state.initialTotal + 26;
-                outcomes.push({ label: "Prórroga", win: overtimeWin });
-                if (overtimeWin) { dailyStats.overtime.won++; dailyStats.total.won++; }
-                else { dailyStats.overtime.lost++; dailyStats.total.lost++; }
-                state.otFinal = true;
-              }
-
-              const overallWin = outcomes.some(o => o.win);
-              const resultText = overallWin ? "Ganaste" : "Perdiste";
-              const breakdown = outcomes.map(o => `• ${o.label}: ${o.win ? "Ganaste" : "Perdiste"}`).join("\n");
-
-              sendNotification(`✅ Partido terminado: ${home} vs ${away}
-Liga: ${league} | País: ${country}
-🏀 Resultado final: ${pointsHome} - ${pointsAway}
-📊 Total puntos: ${totalPoints}
-🎯 Resultado general: ${resultText}
-${breakdown}`);
-            }
             state.final = true;
             notifiedGames.set(key, state);
           }
@@ -203,8 +167,6 @@ ${breakdown}`);
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-
-// --- Hora local Ecuador ---
 function getLocalTime() {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -218,7 +180,6 @@ function getLocalTime() {
   return { hour, day };
 }
 
-// --- Loop cada 15 segundos con horarios diferenciados ---
 setInterval(() => {
   const { hour, day } = getLocalTime();
 
