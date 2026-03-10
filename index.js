@@ -20,6 +20,23 @@ let dailyStats = {
   total: { won: 0, lost: 0 }
 };
 
+// Lista de ligas principales
+const mainLeagues = [
+  "Liga ACB", "Liga Femenina Endesa",
+  "LNB Pro A", "Ligue Féminine de Basketball",
+  "LBA Serie A", "Serie A1",
+  "BBL", "DBBL",
+  "BSL",
+  "CBA", "WCBA",
+  "NBB", "LBF",
+  "LNB", "Liga Femenina de Básquetbol",
+  "LUB", "Liga Femenina de Básquetbol",
+  "NBL", "WNBL",
+  "B.League",
+  "EuroLeague", "EuroCup", "Basketball Champions League",
+  "EuroLeague Women", "Basketball Champions League Americas", "Liga Sudamericana de Clubes"
+];
+
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
@@ -89,6 +106,9 @@ function getLiveBasketEvents() {
           const pointsAway = game.awayScore?.current ?? 0;
           const diff = Math.abs(pointsHome - pointsAway);
           const key = `${home} vs ${away}`;
+
+          // 🔎 Filtrar solo ligas principales
+          if (!mainLeagues.some(l => league.includes(l))) return;
 
           let state = notifiedGames.get(key) || {
             q4_started: false,
@@ -208,7 +228,6 @@ setInterval(() => {
 }, 3 * 60 * 1000); // cada 3 minutos
 
 
-// --- Resumen diario a las 23:59 ---
 function sendDailySummary() {
   const calcPercent = (won, lost) => {
     const total = won + lost;
@@ -218,26 +237,28 @@ function sendDailySummary() {
   const msg = `📊 Resumen del día (${currentDate})
 - Prórroga: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
 - Desbalanceados: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
-- General: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
+- Total: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
 
   sendNotification(msg);
-
-  // Resetear estadísticas y limpiar partidos
-  dailyStats = {
-    overtime: { won: 0, lost: 0 },
-    blowout: { won: 0, lost: 0 },
-    total: { won: 0, lost: 0 }
-  };
-  notifiedGames.clear();
 }
 
-// --- Loop para enviar resumen a las 23:59 ---
+// Ejecutar resumen diario a las 23:59
 setInterval(() => {
   const now = new Date();
-  if (now.getHours() === 23 && now.getMinutes() === 59) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Guayaquil",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
+  const minute = parseInt(parts.find(p => p.type === "minute").value, 10);
+
+  if (hour === 23 && minute === 59) {
     sendDailySummary();
   }
-}, 60 * 1000);
+}, 60 * 1000); // cada minuto
 
 
 
