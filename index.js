@@ -20,23 +20,36 @@ let dailyStats = {
   total: { won: 0, lost: 0 }
 };
 
-// Lista de ligas principales
+// Lista de ligas principales (masculino, femenino y continentales)
 const mainLeagues = [
+  // España
   "Liga ACB", "Liga Femenina Endesa",
+  // Francia
   "LNB Pro A", "Ligue Féminine de Basketball",
+  // Italia
   "LBA Serie A", "Serie A1",
+  // Alemania
   "BBL", "DBBL",
+  // Turquía
   "BSL",
+  // China
   "CBA", "WCBA",
+  // Brasil
   "NBB", "LBF",
+  // Argentina
   "LNB", "Liga Femenina de Básquetbol",
+  // Uruguay
   "LUB", "Liga Femenina de Básquetbol",
+  // Australia/NZ
   "NBL", "WNBL",
+  // Japón
   "B.League",
+  // Estados Unidos
+  "NBA", "WNBA", "NCAA", "G-League",
+  // Competiciones continentales
   "EuroLeague", "EuroCup", "Basketball Champions League",
   "EuroLeague Women", "Basketball Champions League Americas", "Liga Sudamericana de Clubes"
 ];
-
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
