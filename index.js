@@ -91,23 +91,28 @@ function getLiveBasketEvents() {
           const key = `${home} vs ${away}`;
 
           let state = notifiedGames.get(key) || {
+            q4_started: false,
             q4_blowout: false,
             ot: false,
             otFinal: false,
             final: false,
-            initialTotal: 0
+            lastStatus: ""
           };
 
-          // --- Desbalanceado ---
-          if (status && status.toUpperCase().includes("4TH") && diff >= 22 && !state.q4_blowout) {
-            const totalPoints = pointsHome + pointsAway;
-            const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
-            const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
-            const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
-            const avgPrevQuarters = (q1 + q2 + q3) / 3;
-            const suggestion = totalPoints + avgPrevQuarters;
+          // --- Detectar inicio del último cuarto ---
+          if (status.toUpperCase().includes("4TH") && !state.q4_started) {
+            state.q4_started = true;
+            notifiedGames.set(key, state);
 
-            sendNotification(`⚡ Partido desbalanceado en Q4
+            if (diff >= 22 && !state.q4_blowout) {
+              const totalPoints = pointsHome + pointsAway;
+              const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
+              const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
+              const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
+              const avgPrevQuarters = (q1 + q2 + q3) / 3;
+              const suggestion = totalPoints + avgPrevQuarters;
+
+              sendNotification(`⚡ Inicio del último cuarto con desbalance
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -115,9 +120,10 @@ Liga: ${league} | País: ${country}
 📊 Diferencia: ${diff} puntos
 💡 Sugerencia: Menos de ${Math.round(suggestion)}`);
 
-            state.q4_blowout = true;
-            state.initialTotal = totalPoints;
-            notifiedGames.set(key, state);
+              state.q4_blowout = true;
+              state.initialTotal = totalPoints;
+              notifiedGames.set(key, state);
+            }
           }
 
           // --- Prórroga ---
@@ -157,6 +163,8 @@ Liga: ${league} | País: ${country}
             state.final = true;
             notifiedGames.set(key, state);
           }
+
+          state.lastStatus = status;
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -197,7 +205,8 @@ setInterval(() => {
   } else {
     console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
   }
-}, 180 * 1000);
+}, 3 * 60 * 1000); // cada 3 minutos
+
 
 // --- Resumen diario a las 23:59 ---
 function sendDailySummary() {
