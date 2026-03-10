@@ -23,23 +23,23 @@ let dailyStats = {
 // Lista de ligas principales (masculino, femenino y continentales)
 const mainLeagues = [
   // España
-  "Liga ACB", "Liga Femenina Endesa",
+  "Liga Endesa", "Liga Femenina Endesa",
   // Francia
-  "LNB Pro A", "Ligue Féminine de Basketball",
+  "Betclic Élite", "Pro A", "Ligue Féminine de Basketball",
   // Italia
-  "LBA Serie A", "Serie A1",
+  "LBA Serie A", "Serie A1 Femminile",
   // Alemania
-  "BBL", "DBBL",
+  "easyCredit BBL", "DBBL",
   // Turquía
   "BSL",
   // China
   "CBA", "WCBA",
   // Brasil
-  "NBB", "LBF",
+  "NBB", "Liga de Basquete Feminino",
   // Argentina
-  "LNB", "Liga Femenina de Básquetbol",
+  "Liga Nacional de Básquet", "Liga Femenina de Básquetbol",
   // Uruguay
-  "LUB", "Liga Femenina de Básquetbol",
+  "Liga Uruguaya de Básquetbol", "Liga Femenina de Básquetbol",
   // Australia/NZ
   "NBL", "WNBL",
   // Japón
@@ -50,6 +50,7 @@ const mainLeagues = [
   "EuroLeague", "EuroCup", "Basketball Champions League",
   "EuroLeague Women", "Basketball Champions League Americas", "Liga Sudamericana de Clubes"
 ];
+
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
