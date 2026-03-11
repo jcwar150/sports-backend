@@ -215,28 +215,88 @@ Liga: ${league} | País: ${country}
 }
 
 
-// Lista de ligas principales de fútbol (clubes + internacionales + selecciones)
+/ Lista de ligas principales de fútbol (clubes + internacionales + selecciones)
 const mainFootballLeagues = [
-  // Clubes europeos principales
+  // Europa
   "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
   "Eredivisie","Primeira Liga","Super Lig",
 
-  // Clubes americanos principales
-  "MLS","Liga MX","Brasileirão","Argentine Primera División",
-  "Primera A Colombia","LigaPro Ecuador","Primera División Uruguay",
-  "Primera División Chile","Primera División Paraguay","Primera División Perú",
-  "Primera División Bolivia","Primera División Venezuela",
+  // Sudamérica
+  "Brasileirão","Argentine Primera División","Primera A Colombia","LigaPro Ecuador",
+  "Primera División Uruguay","Primera División Chile","Primera División Paraguay",
+  "Primera División Perú","Primera División Bolivia","Primera División Venezuela",
+
+  // Norteamérica y Centroamérica
+  "MLS","Liga MX","Concacaf Champions Cup",
 
   // Competiciones internacionales de clubes
   "UEFA Champions League","UEFA Europa League","UEFA Conference League",
-  "Copa Libertadores","Copa Sudamericana","Concacaf Champions Cup",
+  "Copa Libertadores","Copa Sudamericana",
 
   // Selecciones nacionales
   "FIFA World Cup","Copa América","Euro","Africa Cup of Nations",
   "Asian Cup","Gold Cup","Olympic Football Tournament"
 ];
 
+// Función auxiliar para obtener estadísticas de un partido
+function getFootballStats(eventId, home, away, league, status, state) {
+  const options = {
+    method: "GET",
+    hostname: "sportapi7.p.rapidapi.com",
+    path: `/api/v1/sport/football/events/${eventId}/statistics`,
+    headers: {
+      "x-rapidapi-key": API_SPORT_KEY,
+      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
+    }
+  };
 
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const stats = JSON.parse(data);
+        const corners = stats?.statistics?.corners ?? null;
+        const shotsTotal = stats?.statistics?.shotsTotal ?? null;
+
+        // --- Mitad del partido ---
+        if (status.toUpperCase().includes("HT") && !state.htNotified) {
+          if ((corners !== null && corners <= 2) || (shotsTotal !== null && shotsTotal <= 10)) {
+            sendNotification(`⚽ Mitad del partido
+${home} vs ${away}
+Liga: ${league}
+🏟️ Corners: ${corners ?? "no disponible"}
+🎯 Remates: ${shotsTotal ?? "no disponible"}
+💡 Condición cumplida: ${(corners !== null && corners <= 2) ? "≤2 corners" : ""} ${(shotsTotal !== null && shotsTotal <= 10) ? "≤10 remates" : ""}`);
+          }
+          state.htNotified = true;
+          state.initialCorners = corners;
+          state.initialShots = shotsTotal;
+          notifiedGames.set(`${home} vs ${away}`, state);
+        }
+
+        // --- Final del partido ---
+        if ((status.toUpperCase().includes("FT") || status.toUpperCase().includes("FINAL") || status.toUpperCase().includes("FINISHED")) && !state.finalNotified) {
+          sendNotification(`✅ Final del partido
+${home} vs ${away}
+Liga: ${league}
+🏟️ Corners totales: ${corners ?? "no disponible"}
+🎯 Remates totales: ${shotsTotal ?? "no disponible"}
+📈 En el HT: ${state.initialCorners ?? "no disponible"} corners, ${state.initialShots ?? "no disponible"} remates`);
+          state.finalNotified = true;
+          notifiedGames.set(`${home} vs ${away}`, state);
+        }
+      } catch (err) {
+        console.error("❌ Error parseando estadísticas fútbol:", err.message);
+      }
+    });
+  });
+
+  req.on("error", err => console.error("❌ Error en la petición stats fútbol:", err.message));
+  req.end();
+}
+
+// Función principal para eventos en vivo
 function getLiveFootballEvents() {
   const options = {
     method: "GET",
@@ -261,48 +321,21 @@ function getLiveFootballEvents() {
           const away = game.awayTeam?.name;
           const league = game.tournament?.name || "Liga desconocida";
           const status = game.status?.description || "";
+          const eventId = game.id;
           const key = `${home} vs ${away}`;
 
           // 🔎 Filtrar solo ligas principales
           if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
-          const corners = game.statistics?.corners ?? 0;
-          const shotsTotal = game.statistics?.shotsTotal ?? 0;
-
           let state = notifiedGames.get(key) || {
             htNotified: false,
             finalNotified: false,
-            initialCorners: 0,
-            initialShots: 0
+            initialCorners: null,
+            initialShots: null
           };
 
-          // --- Mitad del partido ---
-          if (status.toUpperCase().includes("HT") && !state.htNotified) {
-            if (corners <= 2 || shotsTotal <= 10) {
-              sendNotification(`⚽ Mitad del partido
-${home} vs ${away}
-Liga: ${league}
-🏟️ Corners: ${corners}
-🎯 Remates: ${shotsTotal}
-💡 Condición cumplida: ${corners <= 2 ? "≤2 corners" : ""} ${shotsTotal <= 10 ? "≤10 remates" : ""}`);
-            }
-            state.htNotified = true;
-            state.initialCorners = corners;
-            state.initialShots = shotsTotal;
-            notifiedGames.set(key, state);
-          }
-
-          // --- Final del partido ---
-          if ((status.toUpperCase().includes("FT") || status.toUpperCase().includes("FINAL") || status.toUpperCase().includes("FINISHED")) && !state.finalNotified) {
-            sendNotification(`✅ Final del partido
-${home} vs ${away}
-Liga: ${league}
-🏟️ Corners totales: ${corners}
-🎯 Remates totales: ${shotsTotal}
-📈 En el HT: ${state.initialCorners} corners, ${state.initialShots} remates`);
-            state.finalNotified = true;
-            notifiedGames.set(key, state);
-          }
+          // Llamada al endpoint de estadísticas
+          getFootballStats(eventId, home, away, league, status, state);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta fútbol:", err.message);
@@ -313,6 +346,7 @@ Liga: ${league}
   req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
   req.end();
 }
+
 
 function getLiveHockeyEvents() {
   const options = {
