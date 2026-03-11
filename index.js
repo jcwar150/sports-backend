@@ -20,40 +20,22 @@ let dailyStats = {
   total: { won: 0, lost: 0 }
 };
 
-// Lista de ligas principales (masculino, femenino y continentales)
+// Lista de ligas principales (clubes + selecciones nacionales)
 const mainLeagues = [
-  // España
   "Liga Endesa", "Liga Femenina Endesa",
-  // Francia
   "Betclic Élite", "Pro A", "Ligue Féminine de Basketball",
-  // Italia
   "LBA Serie A", "Serie A1 Femminile",
-  // Alemania
   "easyCredit BBL", "DBBL",
-  // Turquía
-  "BSL",
-  // Grecia
-  "Greek Basket League",
-  // Lituania
-  "LKL",
-  // China
+  "BSL", "Greek Basket League", "LKL",
   "CBA", "WCBA",
-  // Brasil
   "NBB", "Liga de Basquete Feminino",
-  // Argentina
   "Liga Nacional de Básquet", "Liga Femenina de Básquetbol",
-  // Uruguay
   "Liga Uruguaya de Básquetbol", "Liga Femenina de Básquetbol",
-  // Australia/NZ
   "NBL", "WNBL",
-  // Japón
   "B.League",
-  // Estados Unidos
   "NBA", "WNBA", "NCAA", "G-League",
-  // Competiciones continentales de clubes
   "EuroLeague", "EuroCup", "Basketball Champions League",
   "EuroLeague Women", "Basketball Champions League Americas", "Liga Sudamericana de Clubes",
-  // Competiciones de selecciones nacionales
   "FIBA Basketball World Cup", "FIBA Women’s Basketball World Cup",
   "Olympic Basketball Tournament",
   "EuroBasket", "EuroBasket Women",
@@ -62,6 +44,7 @@ const mainLeagues = [
   "FIBA AfroBasket", "FIBA Women’s AfroBasket",
   "FIBA Oceania Championship"
 ];
+
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
@@ -133,18 +116,17 @@ function getLiveBasketEvents() {
           const key = `${home} vs ${away}`;
 
           // 🔎 Filtrar solo ligas principales
-          if (!mainLeagues.some(l => league.includes(l))) return;
+          if (!mainLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
           let state = notifiedGames.get(key) || {
             q4_started: false,
             q4_blowout: false,
             ot: false,
-            otFinal: false,
             final: false,
-            lastStatus: ""
+            suggestionRange: null
           };
 
-          // --- Detectar inicio del último cuarto ---
+          // --- Último cuarto desbalanceado ---
           if (status.toUpperCase().includes("4TH") && !state.q4_started) {
             state.q4_started = true;
             notifiedGames.set(key, state);
@@ -157,11 +139,10 @@ function getLiveBasketEvents() {
               const avgPrevQuarters = (q1 + q2 + q3) / 3;
               const suggestion = totalPoints + avgPrevQuarters;
 
-              sendNotification(`⚡ Inicio del último cuarto con desbalance
+              sendNotification(`⚡ Último cuarto desbalanceado
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
-⏱️ Tiempo: ${status} (${timerVal})
 📊 Diferencia: ${diff} puntos
 💡 Sugerencia: Menos de ${Math.round(suggestion)}`);
 
@@ -183,33 +164,55 @@ Liga: ${league} | País: ${country}
             !state.ot && !state.final
           ) {
             const totalPoints = pointsHome + pointsAway;
-            const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
-            const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
-            const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
-            const q4 = (game.homeScore?.period4 ?? 0) + (game.awayScore?.period4 ?? 0);
-            const avgPrevQuarters = (q1 + q2 + q3 + q4) / 4;
-            const suggestion = totalPoints + avgPrevQuarters;
+            const suggestionMin = totalPoints + 22;
+            const suggestionMax = totalPoints + 26;
 
             sendNotification(`⏱️ Prórroga detectada
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
-⏱️ Tiempo: ${status} (${timerVal})
 📊 Total puntos: ${totalPoints}
-💡 Sugerencia: Menos de ${Math.round(suggestion)}`);
+💡 Sugerencia: Entre ${suggestionMin} y ${suggestionMax}`);
 
             state.ot = true;
             state.initialTotal = totalPoints;
+            state.suggestionRange = { min: suggestionMin, max: suggestionMax };
             notifiedGames.set(key, state);
           }
 
           // --- Evaluación final ---
           if (status.toUpperCase().includes("FT") && !state.final) {
             state.final = true;
+            const finalTotal = pointsHome + pointsAway;
+
+            // Comparación de prórroga
+            if (state.suggestionRange) {
+              const { min, max } = state.suggestionRange;
+              const won = finalTotal >= min && finalTotal <= max;
+              sendNotification(`✅ Final del partido
+${home} vs ${away}
+Liga: ${league} | País: ${country}
+🏀 ${pointsHome} - ${pointsAway}
+📊 Total final: ${finalTotal}
+💡 Estimado en prórroga: ${min}-${max}
+📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
+            }
+
+            // Comparación de último cuarto desbalanceado
+            if (state.q4_blowout) {
+              const initialTotal = state.initialTotal || 0;
+              const won = finalTotal < initialTotal;
+              sendNotification(`✅ Final del partido
+${home} vs ${away}
+Liga: ${league} | País: ${country}
+🏀 ${pointsHome} - ${pointsAway}
+📊 Total final: ${finalTotal}
+💡 Estimado en último cuarto: ${initialTotal}
+📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
+            }
+
             notifiedGames.set(key, state);
           }
-
-          state.lastStatus = status;
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -251,8 +254,6 @@ setInterval(() => {
     console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
   }
 }, 3 * 60 * 1000); // cada 3 minutos
-
-
 function sendDailySummary() {
   const calcPercent = (won, lost) => {
     const total = won + lost;
