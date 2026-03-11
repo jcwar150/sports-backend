@@ -9,7 +9,7 @@ const ONESIGNAL_API_KEY = process.env.ONESIGNAL_API_KEY;
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => res.send("🏀 Worker de Basket corriendo en Render"));
+app.get("/", (req, res) => res.send("⚽🏀🏒 Worker de deportes corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
 let notifiedGames = new Map();
 let currentDate = new Date().toISOString().split("T")[0];
@@ -20,39 +20,21 @@ let dailyStats = {
   total: { won: 0, lost: 0 }
 };
 
-// Lista de ligas principales (clubes + selecciones nacionales)
 const mainLeagues = [
-  "Liga Endesa", "Liga Femenina Endesa",
-  "Betclic Élite", "Pro A", "Ligue Féminine de Basketball",
-  "LBA Serie A", "Serie A1 Femminile",
-  "easyCredit BBL", "DBBL",
-  "BSL", "Greek Basket League", "LKL",
-  "CBA", "WCBA",
-  "NBB", "Liga de Basquete Feminino",
-  "Liga Nacional de Básquet", "Liga Femenina de Básquetbol",
-  "Liga Uruguaya de Básquetbol", "Liga Femenina de Básquetbol",
-  "NBL", "WNBL",
-  "B.League",
-  "NBA", "WNBA", "NCAA", "G-League",
-  "EuroLeague", "EuroCup", "Basketball Champions League",
-  "EuroLeague Women", "Basketball Champions League Americas", "Liga Sudamericana de Clubes",
-  "FIBA Basketball World Cup", "FIBA Women’s Basketball World Cup",
-  "Olympic Basketball Tournament",
-  "EuroBasket", "EuroBasket Women",
-  "FIBA AmeriCup", "FIBA Women’s AmeriCup",
-  "FIBA Asia Cup", "FIBA Women’s Asia Cup",
-  "FIBA AfroBasket", "FIBA Women’s AfroBasket",
-  "FIBA Oceania Championship"
+  "Liga Endesa","Liga Femenina Endesa","Betclic Élite","Pro A","Ligue Féminine de Basketball",
+  "LBA Serie A","Serie A1 Femminile","easyCredit BBL","DBBL","BSL","Greek Basket League","LKL",
+  "CBA","WCBA","NBB","Liga de Basquete Feminino","Liga Nacional de Básquet","Liga Femenina de Básquetbol",
+  "Liga Uruguaya de Básquetbol","Liga Femenina de Básquetbol","NBL","WNBL","B.League","NBA","WNBA","NCAA","G-League",
+  "EuroLeague","EuroCup","Basketball Champions League","EuroLeague Women","Basketball Champions League Americas","Liga Sudamericana de Clubes",
+  "FIBA Basketball World Cup","FIBA Women’s Basketball World Cup","Olympic Basketball Tournament",
+  "EuroBasket","EuroBasket Women","FIBA AmeriCup","FIBA Women’s AmeriCup","FIBA Asia Cup","FIBA Women’s Asia Cup",
+  "FIBA AfroBasket","FIBA Women’s AfroBasket","FIBA Oceania Championship"
 ];
 
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
-    dailyStats = {
-      overtime: { won: 0, lost: 0 },
-      blowout: { won: 0, lost: 0 },
-      total: { won: 0, lost: 0 }
-    };
+    dailyStats = { overtime:{won:0,lost:0}, blowout:{won:0,lost:0}, total:{won:0,lost:0} };
     notifiedGames.clear();
     currentDate = today;
   }
@@ -64,7 +46,7 @@ async function sendNotification(message) {
       {
         app_id: ONESIGNAL_APP_ID,
         included_segments: ["All"],
-        headings: { en: "🏀 Basket Alert" },
+        headings: { en: "📢 Deportes" },
         contents: { en: message }
       },
       {
@@ -99,6 +81,7 @@ function getLiveBasketEvents() {
       try {
         const json = JSON.parse(data);
         const games = json.data || json.events || [];
+
         games.forEach(game => {
           const home = game.homeTeam?.name;
           const away = game.awayTeam?.name;
@@ -180,50 +163,46 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);
           }
 
-         // --- Evaluación final ---
-if (
-  status &&
-  (
-    status.toUpperCase().includes("FT") ||
-    status.toUpperCase().includes("FINAL") ||
-    status.toUpperCase().includes("FINISHED") ||
-    status.toUpperCase().includes("ENDED") ||
-    status.toUpperCase().includes("FULL TIME")
-  ) &&
-  !state.final
-) {
-  state.final = true;
-  const finalTotal = pointsHome + pointsAway;
+          // --- Evaluación final ---
+          if (
+            (status.toUpperCase().includes("FT") ||
+             status.toUpperCase().includes("FINAL") ||
+             status.toUpperCase().includes("FINISHED") ||
+             status.toUpperCase().includes("ENDED") ||
+             status.toUpperCase().includes("FULL TIME")) &&
+            !state.final
+          ) {
+            state.final = true;
+            const finalTotal = pointsHome + pointsAway;
 
-  // Comparación de prórroga
-  if (state.suggestionRange) {
-    const { min, max } = state.suggestionRange;
-    const won = finalTotal >= min && finalTotal <= max;
-    sendNotification(`✅ Final del partido
+            // Comparación de prórroga
+            if (state.suggestionRange) {
+              const { min, max } = state.suggestionRange;
+              const won = finalTotal >= min && finalTotal <= max;
+              sendNotification(`✅ Final del partido
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total final: ${finalTotal}
 💡 Estimado en prórroga: ${min}-${max}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
-  }
+            }
 
-  // Comparación de último cuarto desbalanceado
-  if (state.q4_blowout) {
-    const initialTotal = state.initialTotal || 0;
-    const won = finalTotal < initialTotal;
-    sendNotification(`✅ Final del partido
+            // Comparación de último cuarto desbalanceado
+            if (state.q4_blowout) {
+              const initialTotal = state.initialTotal || 0;
+              const won = finalTotal < initialTotal;
+              sendNotification(`✅ Final del partido
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total final: ${finalTotal}
 💡 Estimado en último cuarto: ${initialTotal}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
-  }
+            }
 
-  notifiedGames.set(key, state);
-}
-
+            notifiedGames.set(key, state);
+          }
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
@@ -232,6 +211,136 @@ Liga: ${league} | País: ${country}
   });
 
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
+  req.end();
+}
+
+
+function getLiveFootballEvents() {
+  const options = {
+    method: "GET",
+    hostname: "sportapi7.p.rapidapi.com",
+    path: `/api/v1/sport/football/events/live`,
+    headers: {
+      "x-rapidapi-key": API_SPORT_KEY,
+      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
+    }
+  };
+
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const json = JSON.parse(data);
+        const games = json.data || json.events || [];
+
+        games.forEach(game => {
+          const home = game.homeTeam?.name;
+          const away = game.awayTeam?.name;
+          const league = game.tournament?.name || "Liga desconocida";
+          const status = game.status?.description || "";
+          const key = `${home} vs ${away}`;
+
+          const corners = game.statistics?.corners ?? 0;
+          const shotsTotal = game.statistics?.shotsTotal ?? 0;
+
+          let state = notifiedGames.get(key) || {
+            htNotified: false,
+            finalNotified: false,
+            initialCorners: 0,
+            initialShots: 0
+          };
+
+          // --- Mitad del partido ---
+          if (status.toUpperCase().includes("HT") && !state.htNotified) {
+            if (corners <= 2 || shotsTotal <= 10) {
+              sendNotification(`⚽ Mitad del partido
+${home} vs ${away}
+Liga: ${league}
+🏟️ Corners: ${corners}
+🎯 Remates: ${shotsTotal}
+💡 Condición cumplida: ${corners <= 2 ? "≤2 corners" : ""} ${shotsTotal <= 10 ? "≤10 remates" : ""}`);
+            }
+            state.htNotified = true;
+            state.initialCorners = corners;
+            state.initialShots = shotsTotal;
+            notifiedGames.set(key, state);
+          }
+
+          // --- Final del partido ---
+          if ((status.toUpperCase().includes("FT") || status.toUpperCase().includes("FINAL") || status.toUpperCase().includes("FINISHED")) && !state.finalNotified) {
+            sendNotification(`✅ Final del partido
+${home} vs ${away}
+Liga: ${league}
+🏟️ Corners totales: ${corners}
+🎯 Remates totales: ${shotsTotal}
+📈 En el HT: ${state.initialCorners} corners, ${state.initialShots} remates`);
+            state.finalNotified = true;
+            notifiedGames.set(key, state);
+          }
+        });
+      } catch (err) {
+        console.error("❌ Error parseando respuesta fútbol:", err.message);
+      }
+    });
+  });
+
+  req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
+  req.end();
+}
+function getLiveHockeyEvents() {
+  const options = {
+    method: "GET",
+    hostname: "sportapi7.p.rapidapi.com",
+    path: `/api/v1/sport/icehockey/events/live`,
+    headers: {
+      "x-rapidapi-key": API_SPORT_KEY,
+      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
+    }
+  };
+
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const json = JSON.parse(data);
+        const games = json.data || json.events || [];
+
+        games.forEach(game => {
+          const home = game.homeTeam?.name;
+          const away = game.awayTeam?.name;
+          const league = game.tournament?.name || "Liga desconocida";
+          const status = game.status?.description || "";
+          const pointsHome = game.homeScore?.current ?? 0;
+          const pointsAway = game.awayScore?.current ?? 0;
+          const diff = Math.abs(pointsHome - pointsAway);
+
+          // Último período (3rd) con diferencia ≤ 3
+          if (status.toUpperCase().includes("3RD") && diff <= 3) {
+            sendNotification(`🏒 Último período ajustado
+${home} vs ${away}
+Liga: ${league}
+🏆 Marcador: ${pointsHome} - ${pointsAway}
+📊 Diferencia: ${diff} (≤ 3)`);
+          }
+
+          // Evaluación final del partido
+          if (status.toUpperCase().includes("FT") || status.toUpperCase().includes("FINAL") || status.toUpperCase().includes("FINISHED")) {
+            sendNotification(`✅ Final del partido de hockey
+${home} vs ${away}
+Liga: ${league}
+🏆 Marcador final: ${pointsHome} - ${pointsAway}
+📊 Diferencia final: ${diff}`);
+          }
+        });
+      } catch (err) {
+        console.error("❌ Error parseando respuesta hockey:", err.message);
+      }
+    });
+  });
+
+  req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
 function getLocalTime() {
@@ -253,14 +362,17 @@ setInterval(() => {
   let startHour = 12;
   let endHour = 24;
 
+  // Fines de semana: horario distinto
   if (day === 0 || day === 6) {
     startHour = 9;
     endHour = 22;
   }
 
   if (hour >= startHour && hour < endHour) {
-    console.log(`🔄 [${hour}h Ecuador] Buscando partidos de basket...`);
+    console.log(`🔄 [${hour}h Ecuador] Buscando partidos...`);
     getLiveBasketEvents();
+    getLiveFootballEvents();
+    getLiveHockeyEvents();
   } else {
     console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
   }
@@ -272,9 +384,11 @@ function sendDailySummary() {
   };
 
   const msg = `📊 Resumen del día (${currentDate})
-- Prórroga: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
-- Desbalanceados: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
-- Total: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}`;
+- Prórroga Basket: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
+- Desbalanceados Basket: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
+- Total Basket: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}
+⚽ Fútbol: Se notificaron partidos con corners ≤2 o remates ≤10 en HT, y se enviaron totales al FT.
+🏒 Hockey: Se notificaron partidos ajustados en el 3rd period (diferencia ≤3) y resultados finales.`;
 
   sendNotification(msg);
 }
@@ -296,6 +410,7 @@ setInterval(() => {
     sendDailySummary();
   }
 }, 60 * 1000); // cada minuto
+
 
 
 
