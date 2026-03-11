@@ -223,6 +223,9 @@ const mainFootballLeagues = [
 
   // Clubes americanos principales
   "MLS","Liga MX","Brasileirão","Argentine Primera División",
+  "Primera A Colombia","LigaPro Ecuador","Primera División Uruguay",
+  "Primera División Chile","Primera División Paraguay","Primera División Perú",
+  "Primera División Bolivia","Primera División Venezuela",
 
   // Competiciones internacionales de clubes
   "UEFA Champions League","UEFA Europa League","UEFA Conference League",
@@ -232,6 +235,7 @@ const mainFootballLeagues = [
   "FIFA World Cup","Copa América","Euro","Africa Cup of Nations",
   "Asian Cup","Gold Cup","Olympic Football Tournament"
 ];
+
 
 function getLiveFootballEvents() {
   const options = {
