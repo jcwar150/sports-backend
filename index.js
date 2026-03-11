@@ -180,39 +180,50 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);
           }
 
-          // --- Evaluación final ---
-          if (status.toUpperCase().includes("FT") && !state.final) {
-            state.final = true;
-            const finalTotal = pointsHome + pointsAway;
+         // --- Evaluación final ---
+if (
+  status &&
+  (
+    status.toUpperCase().includes("FT") ||
+    status.toUpperCase().includes("FINAL") ||
+    status.toUpperCase().includes("FINISHED") ||
+    status.toUpperCase().includes("ENDED") ||
+    status.toUpperCase().includes("FULL TIME")
+  ) &&
+  !state.final
+) {
+  state.final = true;
+  const finalTotal = pointsHome + pointsAway;
 
-            // Comparación de prórroga
-            if (state.suggestionRange) {
-              const { min, max } = state.suggestionRange;
-              const won = finalTotal >= min && finalTotal <= max;
-              sendNotification(`✅ Final del partido
+  // Comparación de prórroga
+  if (state.suggestionRange) {
+    const { min, max } = state.suggestionRange;
+    const won = finalTotal >= min && finalTotal <= max;
+    sendNotification(`✅ Final del partido
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total final: ${finalTotal}
 💡 Estimado en prórroga: ${min}-${max}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
-            }
+  }
 
-            // Comparación de último cuarto desbalanceado
-            if (state.q4_blowout) {
-              const initialTotal = state.initialTotal || 0;
-              const won = finalTotal < initialTotal;
-              sendNotification(`✅ Final del partido
+  // Comparación de último cuarto desbalanceado
+  if (state.q4_blowout) {
+    const initialTotal = state.initialTotal || 0;
+    const won = finalTotal < initialTotal;
+    sendNotification(`✅ Final del partido
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total final: ${finalTotal}
 💡 Estimado en último cuarto: ${initialTotal}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
-            }
+  }
 
-            notifiedGames.set(key, state);
-          }
+  notifiedGames.set(key, state);
+}
+
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta basket:", err.message);
