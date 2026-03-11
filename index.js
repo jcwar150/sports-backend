@@ -215,7 +215,7 @@ Liga: ${league} | País: ${country}
 }
 
 
-/ Lista de ligas principales de fútbol (clubes + internacionales + selecciones)
+// Lista de ligas principales de fútbol (clubes + internacionales + selecciones)
 const mainFootballLeagues = [
   // Europa
   "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
