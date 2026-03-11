@@ -32,6 +32,10 @@ const mainLeagues = [
   "easyCredit BBL", "DBBL",
   // Turquía
   "BSL",
+  // Grecia
+  "Greek Basket League",
+  // Lituania
+  "LKL",
   // China
   "CBA", "WCBA",
   // Brasil
@@ -46,11 +50,18 @@ const mainLeagues = [
   "B.League",
   // Estados Unidos
   "NBA", "WNBA", "NCAA", "G-League",
-  // Competiciones continentales
+  // Competiciones continentales de clubes
   "EuroLeague", "EuroCup", "Basketball Champions League",
-  "EuroLeague Women", "Basketball Champions League Americas", "Liga Sudamericana de Clubes"
+  "EuroLeague Women", "Basketball Champions League Americas", "Liga Sudamericana de Clubes",
+  // Competiciones de selecciones nacionales
+  "FIBA Basketball World Cup", "FIBA Women’s Basketball World Cup",
+  "Olympic Basketball Tournament",
+  "EuroBasket", "EuroBasket Women",
+  "FIBA AmeriCup", "FIBA Women’s AmeriCup",
+  "FIBA Asia Cup", "FIBA Women’s Asia Cup",
+  "FIBA AfroBasket", "FIBA Women’s AfroBasket",
+  "FIBA Oceania Championship"
 ];
-
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
