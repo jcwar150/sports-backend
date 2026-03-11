@@ -215,6 +215,24 @@ Liga: ${league} | País: ${country}
 }
 
 
+// Lista de ligas principales de fútbol (clubes + internacionales + selecciones)
+const mainFootballLeagues = [
+  // Clubes europeos principales
+  "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
+  "Eredivisie","Primeira Liga","Super Lig",
+
+  // Clubes americanos principales
+  "MLS","Liga MX","Brasileirão","Argentine Primera División",
+
+  // Competiciones internacionales de clubes
+  "UEFA Champions League","UEFA Europa League","UEFA Conference League",
+  "Copa Libertadores","Copa Sudamericana","Concacaf Champions Cup",
+
+  // Selecciones nacionales
+  "FIFA World Cup","Copa América","Euro","Africa Cup of Nations",
+  "Asian Cup","Gold Cup","Olympic Football Tournament"
+];
+
 function getLiveFootballEvents() {
   const options = {
     method: "GET",
@@ -240,6 +258,9 @@ function getLiveFootballEvents() {
           const league = game.tournament?.name || "Liga desconocida";
           const status = game.status?.description || "";
           const key = `${home} vs ${away}`;
+
+          // 🔎 Filtrar solo ligas principales
+          if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
           const corners = game.statistics?.corners ?? 0;
           const shotsTotal = game.statistics?.shotsTotal ?? 0;
@@ -288,6 +309,7 @@ Liga: ${league}
   req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
   req.end();
 }
+
 function getLiveHockeyEvents() {
   const options = {
     method: "GET",
