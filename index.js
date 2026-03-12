@@ -98,44 +98,21 @@ function getLiveBasketEvents() {
           const diff = Math.abs(pointsHome - pointsAway);
           const key = `${home} vs ${away}`;
 
-          // 🔎 Filtrar solo ligas principales
-          if (!mainLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
-
           let state = notifiedGames.get(key) || {
-            q4_started: false,
-            q4_blowout: false,
             ot: false,
             final: false,
             suggestionRange: null
           };
 
-          // --- Último cuarto desbalanceado ---
-          if (status.toUpperCase().includes("4TH") && !state.q4_started) {
-            state.q4_started = true;
-            notifiedGames.set(key, state);
-
-            if (diff >= 22 && !state.q4_blowout) {
-              const totalPoints = pointsHome + pointsAway;
-              const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
-              const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
-              const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
-              const avgPrevQuarters = (q1 + q2 + q3) / 3;
-              const suggestion = totalPoints + avgPrevQuarters;
-
-              sendNotification(`⚡ Último cuarto desbalanceado
+          // 🔎 Notificación de debug con toda la info (sin filtros)
+          sendNotification(`🔎 Debug Basket
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
-🏀 ${pointsHome} - ${pointsAway}
-📊 Diferencia: ${diff} puntos
-💡 Sugerencia: Menos de ${Math.round(suggestion)}`);
+⏱️ Estado: ${status} | Tiempo: ${timerVal}
+🏀 Marcador: ${pointsHome} - ${pointsAway}
+📊 Diferencia: ${diff} puntos`);
 
-              state.q4_blowout = true;
-              state.initialTotal = totalPoints;
-              notifiedGames.set(key, state);
-            }
-          }
-
-          // --- Prórroga ---
+          // --- Prórroga (mantiene la lógica original) ---
           if (
             status &&
             (
@@ -163,7 +140,7 @@ Liga: ${league} | País: ${country}
             notifiedGames.set(key, state);
           }
 
-          // --- Evaluación final ---
+          // --- Evaluación final de prórroga ---
           if (
             (status.toUpperCase().includes("FT") ||
              status.toUpperCase().includes("FINAL") ||
@@ -175,7 +152,6 @@ Liga: ${league} | País: ${country}
             state.final = true;
             const finalTotal = pointsHome + pointsAway;
 
-            // Comparación de prórroga
             if (state.suggestionRange) {
               const { min, max } = state.suggestionRange;
               const won = finalTotal >= min && finalTotal <= max;
@@ -185,19 +161,6 @@ Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
 📊 Total final: ${finalTotal}
 💡 Estimado en prórroga: ${min}-${max}
-📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
-            }
-
-            // Comparación de último cuarto desbalanceado
-            if (state.q4_blowout) {
-              const initialTotal = state.initialTotal || 0;
-              const won = finalTotal < initialTotal;
-              sendNotification(`✅ Final del partido
-${home} vs ${away}
-Liga: ${league} | País: ${country}
-🏀 ${pointsHome} - ${pointsAway}
-📊 Total final: ${finalTotal}
-💡 Estimado en último cuarto: ${initialTotal}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
             }
 
