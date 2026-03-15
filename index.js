@@ -323,9 +323,7 @@ function getLiveFootballEvents() {
   req.end();
 }
 
-
-
-function getLiveHockeyEventsDebug();{
+function getLiveHockeyEvents() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -348,11 +346,6 @@ function getLiveHockeyEventsDebug();{
           const home = game.homeTeam?.name;
           const away = game.awayTeam?.name;
           const league = game.tournament?.name || "Liga desconocida";
-          const country =
-            game.tournament?.region?.name ||
-            game.tournament?.category?.name ||
-            game.tournament?.country?.name ||
-            "País desconocido";
           const status = game.status?.description || "";
           const timerVal = game.status?.timer || "sin dato";
           const goalsHome = game.homeScore?.current ?? 0;
@@ -362,10 +355,9 @@ function getLiveHockeyEventsDebug();{
           // 🔎 Filtrar solo NHL
           if (!league.toLowerCase().includes("nhl")) return;
 
-          // Notificación de debug con toda la info
           sendNotification(`🔎 Debug NHL
 ${home} vs ${away}
-Liga: ${league} | País: ${country}
+Liga: ${league}
 ⏱️ Estado: ${status} | Tiempo: ${timerVal}
 🏒 Marcador: ${goalsHome} - ${goalsAway}
 📊 Diferencia: ${diff} goles`);
@@ -379,6 +371,7 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
+
 
 function getLocalTime() {
   const now = new Date();
