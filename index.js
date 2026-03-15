@@ -218,74 +218,13 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-// Lista de ligas principales de fútbol (clubes + internacionales + selecciones)
-const mainFootballLeagues = [
-  // Europa
-  "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
-  "Eredivisie","Primeira Liga","Super Lig",
-
-  // Sudamérica
-  "Brasileirão","Argentine Primera División","Primera A Colombia","LigaPro Ecuador",
-  "Primera División Uruguay","Primera División Chile","Primera División Paraguay",
-  "Primera División Perú","Primera División Bolivia","Primera División Venezuela",
-
-  // Norteamérica y Centroamérica
-  "MLS","Liga MX","Concacaf Champions Cup",
-
-  // Competiciones internacionales de clubes
-  "UEFA Champions League","UEFA Europa League","UEFA Conference League",
-  "Copa Libertadores","Copa Sudamericana",
-
-  // Selecciones nacionales
-  "FIFA World Cup","Copa América","Euro","Africa Cup of Nations",
-  "Asian Cup","Gold Cup","Olympic Football Tournament"
+// Lista de equipos fuertes
+const strongTeams = [
+  "Barcelona", "Real Madrid", "Bayern Munich", "PSG", "Manchester City",
+  "Liverpool", "Chelsea", "Juventus", "Inter", "AC Milan"
 ];
 
-
-// Función para consultar incidentes de un partido
-function getFootballIncidents(eventId, home, away, league, status) {
-  const options = {
-    method: "GET",
-    hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/event/${eventId}/incidents`,
-    headers: {
-      "x-rapidapi-key": API_SPORT_KEY,
-      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
-    }
-  };
-
-  const req = https.request(options, res => {
-    let data = "";
-    res.on("data", chunk => (data += chunk));
-    res.on("end", () => {
-      try {
-        const incidents = JSON.parse(data).data || [];
-
-        const corners = incidents.filter(i => i.incidentType?.toLowerCase() === "corner").length;
-        const goals = incidents.filter(i => i.incidentType?.toLowerCase() === "goal").length;
-        const yellows = incidents.filter(i => i.incidentType?.toLowerCase().includes("yellow")).length;
-        const reds = incidents.filter(i => i.incidentType?.toLowerCase().includes("red")).length;
-
-        sendNotification(`📊 Incidentes en vivo
-${home} vs ${away}
-Liga: ${league}
-Estado: ${status}
-🏟️ Córneres: ${corners}
-⚽ Goles: ${goals}
-🟨 Amarillas: ${yellows}
-🟥 Rojas: ${reds}`);
-      } catch (err) {
-        console.error("❌ Error parseando incidentes fútbol:", err.message);
-      }
-    });
-  });
-
-  req.on("error", err => console.error("❌ Error en la petición incidentes fútbol:", err.message));
-  req.end();
-}
-
-// Función para traer partidos en vivo y filtrar por ligas principales
-function getLiveFootballEvents() {
+function getLiveFootballEventsStrongTeams() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -309,13 +248,35 @@ function getLiveFootballEvents() {
           const away = game.awayTeam?.name;
           const league = game.tournament?.name || "Liga desconocida";
           const status = game.status?.description || "";
-          const eventId = game.id;
+          const pointsHome = game.homeScore?.current ?? 0;
+          const pointsAway = game.awayScore?.current ?? 0;
 
-          // 🔎 Filtrar solo ligas principales
-          if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
+          // 🔎 Verificar si es primer tiempo
+          const statusNorm = status.toLowerCase();
+          const isFirstHalf = statusNorm.includes("1st") || statusNorm.includes("first") || statusNorm.includes("ht");
 
-          // Consultar incidentes del partido
-          getFootballIncidents(eventId, home, away, league, status);
+          if (!isFirstHalf) return;
+
+          // 🔎 Verificar si alguno de los equipos es fuerte
+          const isStrongHome = strongTeams.some(t => home.toLowerCase().includes(t.toLowerCase()));
+          const isStrongAway = strongTeams.some(t => away.toLowerCase().includes(t.toLowerCase()));
+
+          // 🔎 Si el equipo fuerte está perdiendo
+          if (isStrongHome && pointsHome < pointsAway) {
+            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
+${home} vs ${away}
+Liga: ${league}
+Estado: ${status}
+Marcador: ${pointsHome} - ${pointsAway}`);
+          }
+
+          if (isStrongAway && pointsAway < pointsHome) {
+            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
+${home} vs ${away}
+Liga: ${league}
+Estado: ${status}
+Marcador: ${pointsHome} - ${pointsAway}`);
+          }
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta fútbol:", err.message);
