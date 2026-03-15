@@ -244,12 +244,12 @@ const mainFootballLeagues = [
   "Asian Cup","Gold Cup","Olympic Football Tournament"
 ];
 
-// Función auxiliar para obtener estadísticas de un partido
-function getFootballStats(eventId, home, away, league, status, state) {
+
+function getFootballStats(eventId, home, away, league, status) {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/sport/football/events/${eventId}/statistics`,
+    path: `/api/v1/event/${eventId}/statistics`,
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -262,36 +262,18 @@ function getFootballStats(eventId, home, away, league, status, state) {
     res.on("end", () => {
       try {
         const stats = JSON.parse(data);
-        const corners = stats?.statistics?.corners ?? null;
-        const shotsTotal = stats?.statistics?.shotsTotal ?? null;
 
-        // --- Mitad del partido ---
-        if (status.toUpperCase().includes("HT") && !state.htNotified) {
-          if ((corners !== null && corners <= 2) || (shotsTotal !== null && shotsTotal <= 10)) {
-            sendNotification(`⚽ Mitad del partido
+        const corners = stats?.statistics?.corners ?? "no disponible";
+        const shotsTotal = stats?.statistics?.shotsTotal ?? "no disponible";
+        const possession = stats?.statistics?.possession ?? "no disponible";
+
+        sendNotification(`📊 Estadísticas en vivo
 ${home} vs ${away}
 Liga: ${league}
-🏟️ Corners: ${corners ?? "no disponible"}
-🎯 Remates: ${shotsTotal ?? "no disponible"}
-💡 Condición cumplida: ${(corners !== null && corners <= 2) ? "≤2 corners" : ""} ${(shotsTotal !== null && shotsTotal <= 10) ? "≤10 remates" : ""}`);
-          }
-          state.htNotified = true;
-          state.initialCorners = corners;
-          state.initialShots = shotsTotal;
-          notifiedGames.set(`${home} vs ${away}`, state);
-        }
-
-        // --- Final del partido ---
-        if ((status.toUpperCase().includes("FT") || status.toUpperCase().includes("FINAL") || status.toUpperCase().includes("FINISHED")) && !state.finalNotified) {
-          sendNotification(`✅ Final del partido
-${home} vs ${away}
-Liga: ${league}
-🏟️ Corners totales: ${corners ?? "no disponible"}
-🎯 Remates totales: ${shotsTotal ?? "no disponible"}
-📈 En el HT: ${state.initialCorners ?? "no disponible"} corners, ${state.initialShots ?? "no disponible"} remates`);
-          state.finalNotified = true;
-          notifiedGames.set(`${home} vs ${away}`, state);
-        }
+Estado: ${status}
+🏟️ Corners: ${corners}
+🎯 Remates: ${shotsTotal}
+⚖️ Posesión: ${possession}`);
       } catch (err) {
         console.error("❌ Error parseando estadísticas fútbol:", err.message);
       }
@@ -302,7 +284,6 @@ Liga: ${league}
   req.end();
 }
 
-// Función principal para eventos en vivo
 function getLiveFootballEvents() {
   const options = {
     method: "GET",
@@ -328,20 +309,12 @@ function getLiveFootballEvents() {
           const league = game.tournament?.name || "Liga desconocida";
           const status = game.status?.description || "";
           const eventId = game.id;
-          const key = `${home} vs ${away}`;
 
           // 🔎 Filtrar solo ligas principales
           if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
-          let state = notifiedGames.get(key) || {
-            htNotified: false,
-            finalNotified: false,
-            initialCorners: null,
-            initialShots: null
-          };
-
-          // Llamada al endpoint de estadísticas
-          getFootballStats(eventId, home, away, league, status, state);
+          // Consultar estadísticas del partido
+          getFootballStats(eventId, home, away, league, status);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta fútbol:", err.message);
@@ -352,6 +325,7 @@ function getLiveFootballEvents() {
   req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
   req.end();
 }
+
 
 
 function getLiveHockeyEvents() {
