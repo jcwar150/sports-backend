@@ -218,9 +218,6 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-
-
-
 // Lista de ligas principales de fútbol (clubes + internacionales + selecciones)
 const mainFootballLeagues = [
   // Europa
@@ -328,7 +325,7 @@ function getLiveFootballEvents() {
 
 
 
-function getLiveHockeyEventsDebug() {
+function getLiveHockeyEventsDebug();{
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
