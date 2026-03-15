@@ -328,7 +328,7 @@ function getLiveFootballEvents() {
 
 
 
-function getLiveHockeyEvents() {
+function getLiveHockeyEventsDebug() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -351,28 +351,27 @@ function getLiveHockeyEvents() {
           const home = game.homeTeam?.name;
           const away = game.awayTeam?.name;
           const league = game.tournament?.name || "Liga desconocida";
+          const country =
+            game.tournament?.region?.name ||
+            game.tournament?.category?.name ||
+            game.tournament?.country?.name ||
+            "País desconocido";
           const status = game.status?.description || "";
-          const pointsHome = game.homeScore?.current ?? 0;
-          const pointsAway = game.awayScore?.current ?? 0;
-          const diff = Math.abs(pointsHome - pointsAway);
+          const timerVal = game.status?.timer || "sin dato";
+          const goalsHome = game.homeScore?.current ?? 0;
+          const goalsAway = game.awayScore?.current ?? 0;
+          const diff = Math.abs(goalsHome - goalsAway);
 
-          // Último período (3rd) con diferencia ≤ 3
-          if (status.toUpperCase().includes("3RD") && diff <= 3) {
-            sendNotification(`🏒 Último período ajustado
-${home} vs ${away}
-Liga: ${league}
-🏆 Marcador: ${pointsHome} - ${pointsAway}
-📊 Diferencia: ${diff} (≤ 3)`);
-          }
+          // 🔎 Filtrar solo NHL
+          if (!league.toLowerCase().includes("nhl")) return;
 
-          // Evaluación final del partido
-          if (status.toUpperCase().includes("FT") || status.toUpperCase().includes("FINAL") || status.toUpperCase().includes("FINISHED")) {
-            sendNotification(`✅ Final del partido de hockey
+          // Notificación de debug con toda la info
+          sendNotification(`🔎 Debug NHL
 ${home} vs ${away}
-Liga: ${league}
-🏆 Marcador final: ${pointsHome} - ${pointsAway}
-📊 Diferencia final: ${diff}`);
-          }
+Liga: ${league} | País: ${country}
+⏱️ Estado: ${status} | Tiempo: ${timerVal}
+🏒 Marcador: ${goalsHome} - ${goalsAway}
+📊 Diferencia: ${diff} goles`);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta hockey:", err.message);
@@ -383,6 +382,7 @@ Liga: ${league}
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
+
 function getLocalTime() {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat("en-US", {
