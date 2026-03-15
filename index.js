@@ -242,11 +242,12 @@ const mainFootballLeagues = [
 ];
 
 
-function getFootballStats(eventId, home, away, league, status) {
+// Función para consultar incidentes de un partido
+function getFootballIncidents(eventId, home, away, league, status) {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/event/${eventId}/statistics`,
+    path: `/api/v1/event/${eventId}/incidents`,
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -258,29 +259,32 @@ function getFootballStats(eventId, home, away, league, status) {
     res.on("data", chunk => (data += chunk));
     res.on("end", () => {
       try {
-        const stats = JSON.parse(data);
+        const incidents = JSON.parse(data).data || [];
 
-        const corners = stats?.statistics?.corners ?? "no disponible";
-        const shotsTotal = stats?.statistics?.shotsTotal ?? "no disponible";
-        const possession = stats?.statistics?.possession ?? "no disponible";
+        const corners = incidents.filter(i => i.incidentType?.toLowerCase() === "corner").length;
+        const goals = incidents.filter(i => i.incidentType?.toLowerCase() === "goal").length;
+        const yellows = incidents.filter(i => i.incidentType?.toLowerCase().includes("yellow")).length;
+        const reds = incidents.filter(i => i.incidentType?.toLowerCase().includes("red")).length;
 
-        sendNotification(`📊 Estadísticas en vivo
+        sendNotification(`📊 Incidentes en vivo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
-🏟️ Corners: ${corners}
-🎯 Remates: ${shotsTotal}
-⚖️ Posesión: ${possession}`);
+🏟️ Córneres: ${corners}
+⚽ Goles: ${goals}
+🟨 Amarillas: ${yellows}
+🟥 Rojas: ${reds}`);
       } catch (err) {
-        console.error("❌ Error parseando estadísticas fútbol:", err.message);
+        console.error("❌ Error parseando incidentes fútbol:", err.message);
       }
     });
   });
 
-  req.on("error", err => console.error("❌ Error en la petición stats fútbol:", err.message));
+  req.on("error", err => console.error("❌ Error en la petición incidentes fútbol:", err.message));
   req.end();
 }
 
+// Función para traer partidos en vivo y filtrar por ligas principales
 function getLiveFootballEvents() {
   const options = {
     method: "GET",
@@ -310,8 +314,8 @@ function getLiveFootballEvents() {
           // 🔎 Filtrar solo ligas principales
           if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
-          // Consultar estadísticas del partido
-          getFootballStats(eventId, home, away, league, status);
+          // Consultar incidentes del partido
+          getFootballIncidents(eventId, home, away, league, status);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta fútbol:", err.message);
@@ -322,6 +326,7 @@ function getLiveFootballEvents() {
   req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
   req.end();
 }
+
 
 function getLiveHockeyEvents() {
   const options = {
