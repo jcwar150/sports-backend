@@ -219,12 +219,7 @@ Liga: ${league} | País: ${country}
   req.end();
 }
 // Lista de equipos fuertes
-const strongTeams = [
-  "Barcelona", "Real Madrid", "Bayern Munich", "PSG", "Manchester City",
-  "Liverpool", "Chelsea", "Juventus", "Inter", "AC Milan"
-];
-
-function getLiveFootballEventsStrongTeams() {
+function getLiveFootballEvents() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -251,17 +246,19 @@ function getLiveFootballEventsStrongTeams() {
           const pointsHome = game.homeScore?.current ?? 0;
           const pointsAway = game.awayScore?.current ?? 0;
 
-          // 🔎 Verificar si es primer tiempo
           const statusNorm = status.toLowerCase();
           const isFirstHalf = statusNorm.includes("1st") || statusNorm.includes("first") || statusNorm.includes("ht");
 
           if (!isFirstHalf) return;
 
-          // 🔎 Verificar si alguno de los equipos es fuerte
+          const strongTeams = [
+            "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
+            "Liverpool","Chelsea","Juventus","Inter","AC Milan"
+          ];
+
           const isStrongHome = strongTeams.some(t => home.toLowerCase().includes(t.toLowerCase()));
           const isStrongAway = strongTeams.some(t => away.toLowerCase().includes(t.toLowerCase()));
 
-          // 🔎 Si el equipo fuerte está perdiendo
           if (isStrongHome && pointsHome < pointsAway) {
             sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
 ${home} vs ${away}
