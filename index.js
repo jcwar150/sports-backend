@@ -348,7 +348,6 @@ function getLiveHockeyEvents() {
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
 
-          // 🔎 Filtrar solo NHL
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
@@ -370,41 +369,77 @@ Marcador: ${goalsHome} - ${goalsAway}`);
 
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
-// --- Control de horario de funcionamiento ---
-// Por ejemplo: solo entre 12:00 y 23:59
-function isWithinOperatingHours() {
-  const now = new Date();
-  const hour = now.getHours();
-  return hour >= 12 && hour <= 23;
 }
 
-// --- Scheduler para ejecutar cada cierto tiempo ---
+// --- Obtener hora local en Ecuador ---
+function getLocalTime() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Guayaquil",
+    hour: "numeric",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
+  const day = now.getDay(); // 0 = domingo, 6 = sábado
+  return { hour, day };
+}
+
+// --- Scheduler con control de horario ---
 setInterval(() => {
-  if (!isWithinOperatingHours()) {
-    console.log("⏱️ Fuera del horario de funcionamiento, no se ejecutan chequeos.");
-    return;
+  const { hour, day } = getLocalTime();
+
+  let startHour = 12;
+  let endHour = 24;
+
+  // Fines de semana: horario distinto
+  if (day === 0 || day === 6) {
+    startHour = 9;
+    endHour = 22;
   }
 
-  console.log("⏱️ Ejecutando chequeo de eventos en vivo...");
-  getLiveFootballEvents();
-  getLiveBasketEvents();
-  getLiveHockeyEvents();
-}, 3*60 * 1000); // cada 60 segundos
+  if (hour >= startHour && hour < endHour) {
+    console.log(`🔄 [${hour}h Ecuador] Buscando partidos...`);
+    getLiveBasketEvents();
+    getLiveFootballEvents();
+    getLiveHockeyEvents();
+  } else {
+    console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
+  }
+}, 3 * 60 * 1000); // cada 3 minutos
 
-// --- Resumen diario al final del día ---
+// --- Resumen diario ---
 function sendDailySummary() {
-  const summary = `📊 Resumen diario (${currentDate})
-🏀 Blowouts: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}
-⏱️ Overtimes: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}
-📈 Totales: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}`;
+  const calcPercent = (won, lost) => {
+    const total = won + lost;
+    return total === 0 ? "0%" : ((won / total) * 100).toFixed(1) + "%";
+  };
 
-  sendNotification(summary);
+  const msg = `📊 Resumen del día (${currentDate})
+- Prórroga Basket: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
+- Desbalanceados Basket: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
+- Total Basket: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}
+
+⚽ Fútbol: Se notificaron partidos con corners ≤2 o remates ≤10 en HT, y se enviaron totales al FT.
+🏒 Hockey: Se notificaron partidos ajustados en el 3rd period (diferencia ≤3) y resultados finales.`;
+
+  sendNotification(msg);
 }
 
-// Ejecutar resumen diario a medianoche
+// --- Ejecutar resumen diario a las 23:59 ---
 setInterval(() => {
   const now = new Date();
-  if (now.getHours() === 0 && now.getMinutes() === 0) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Guayaquil",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
+  const minute = parseInt(parts.find(p => p.type === "minute").value, 10);
+
+  if (hour === 23 && minute === 59) {
     sendDailySummary();
   }
-}, 60 * 1000); // chequea cada minuto
+}, 60 * 1000); // cada minuto
