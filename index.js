@@ -341,6 +341,8 @@ Marcador: ${pointsHome} - ${pointsAway}`);
 }
 
 
+const notifiedHockeyGames = new Map();
+
 function getLiveHockeyEvents() {
   const options = {
     method: "GET",
@@ -360,25 +362,32 @@ function getLiveHockeyEvents() {
         const json = JSON.parse(data);
         const games = json.data || json.events || [];
 
+        if (!games.length) {
+          console.log("📭 No hay partidos de hockey en vivo.");
+          return;
+        }
+
         games.forEach(game => {
           const home = game.homeTeam?.name;
           const away = game.awayTeam?.name;
-          const league = game.tournament?.name || "Liga desconocida";
+          const league = game.tournament?.name || "";
           const status = game.status?.description || "";
-          const timerVal = game.status?.timer || "sin dato";
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
-          const diff = Math.abs(goalsHome - goalsAway);
 
           // 🔎 Filtrar solo NHL
           if (!league.toLowerCase().includes("nhl")) return;
 
-          sendNotification(`🔎 Debug NHL
+          const key = `${home} vs ${away}`;
+          if (notifiedHockeyGames.has(key)) return;
+
+          sendNotification(`🏒 NHL en vivo
 ${home} vs ${away}
 Liga: ${league}
-⏱️ Estado: ${status} | Tiempo: ${timerVal}
-🏒 Marcador: ${goalsHome} - ${goalsAway}
-📊 Diferencia: ${diff} goles`);
+Estado: ${status}
+Marcador: ${goalsHome} - ${goalsAway}`);
+
+          notifiedHockeyGames.set(key, true);
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta hockey:", err.message);
@@ -389,6 +398,7 @@ Liga: ${league}
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
+
 
 
 function getLocalTime() {
