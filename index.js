@@ -11,9 +11,14 @@ const PORT = process.env.PORT || 3000;
 
 app.get("/", (req, res) => res.send("⚽🏀🏒 Worker de deportes corriendo en Render"));
 app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
-let notifiedGames = new Map();
-let currentDate = new Date().toISOString().split("T")[0];
 
+// --- Maps globales por deporte ---
+const notifiedFootballGames = new Map();
+const notifiedBasketGames = new Map();
+const notifiedHockeyGames = new Map();
+
+// --- Control de fecha y estadísticas ---
+let currentDate = new Date().toISOString().split("T")[0];
 let dailyStats = {
   overtime: { won: 0, lost: 0 },
   blowout: { won: 0, lost: 0 },
@@ -24,10 +29,14 @@ function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
     dailyStats = { overtime:{won:0,lost:0}, blowout:{won:0,lost:0}, total:{won:0,lost:0} };
-    notifiedGames.clear();
+    notifiedFootballGames.clear();
+    notifiedBasketGames.clear();
+    notifiedHockeyGames.clear();
     currentDate = today;
   }
 }
+
+// --- Notificaciones vía OneSignal ---
 async function sendNotification(message) {
   try {
     await axios.post(
@@ -49,9 +58,107 @@ async function sendNotification(message) {
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
+
+// --- Equipos fuertes ---
+const strongTeams = [
+  "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
+  "Liverpool","Chelsea","Juventus","Inter","AC Milan",
+  "Boca Juniors","River Plate","Flamengo","Palmeiras","Corinthians","São Paulo",
+  "Colo-Colo","Universidad de Chile","Atlético Nacional","Millonarios",
+  "Barcelona SC","LDU Quito","Independiente del Valle","Peñarol","Nacional",
+  "Olimpia","Cerro Porteño","Alianza Lima","Universitario",
+  "Bolívar","The Strongest","Caracas FC","Deportivo Táchira"
+];
+
+// --- Ligas principales ---
+const mainFootballLeagues = [
+  "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
+  "Brasileirão","Argentine Primera División","Primera A Colombia","LigaPro Ecuador",
+  "Primera División Uruguay","Primera División Chile","Primera División Paraguay",
+  "Primera División Perú","Primera División Bolivia","Primera División Venezuela",
+  "UEFA Champions League","Copa Libertadores","Copa Sudamericana",
+  "FIFA World Cup","Copa América","Euro"
+];
+
+// --- Normalización de nombres ---
+function normalizeTeamName(name) {
+  return name.replace(/u\d+|b|ii|reserves|sub/gi, "").trim();
 }
+
+// --- Lógica de fútbol ---
+function getLiveFootballEvents() {
+  const options = {
+    method: "GET",
+    hostname: "sportapi7.p.rapidapi.com",
+    path: `/api/v1/sport/football/events/live`,
+    headers: {
+      "x-rapidapi-key": API_SPORT_KEY,
+      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
+    }
+  };
+
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const json = JSON.parse(data);
+        const games = json.data || json.events || [];
+
+        games.forEach(game => {
+          const homeRaw = game.homeTeam?.name || "";
+          const awayRaw = game.awayTeam?.name || "";
+          const home = normalizeTeamName(homeRaw);
+          const away = normalizeTeamName(awayRaw);
+
+          const league = game.tournament?.name || "Liga desconocida";
+          const status = game.status?.description || "";
+          const pointsHome = game.homeScore?.current ?? 0;
+          const pointsAway = game.awayScore?.current ?? 0;
+
+          if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
+
+          const statusNorm = status.toLowerCase();
+          const isFirstHalf = statusNorm.includes("1st") || statusNorm.includes("first") || statusNorm.includes("ht");
+          if (!isFirstHalf) return;
+
+          const isStrongHome = strongTeams.some(t => home.toLowerCase() === t.toLowerCase());
+          const isStrongAway = strongTeams.some(t => away.toLowerCase() === t.toLowerCase());
+
+          const key = `${home} vs ${away}`;
+          if (notifiedFootballGames.has(key)) return;
+
+          if (isStrongHome && pointsHome < pointsAway) {
+            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
+${homeRaw} vs ${awayRaw}
+Liga: ${league}
+Estado: ${status}
+Marcador: ${pointsHome} - ${pointsAway}`);
+            notifiedFootballGames.set(key, true);
+          }
+
+          if (isStrongAway && pointsAway < pointsHome) {
+            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
+${homeRaw} vs ${awayRaw}
+Liga: ${league}
+Estado: ${status}
+Marcador: ${pointsHome} - ${pointsAway}`);
+            notifiedFootballGames.set(key, true);
+          }
+        });
+      } catch (err) {
+        console.error("❌ Error parseando respuesta fútbol:", err.message);
+      }
+    });
+  });
+
+  req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
+  req.end();
+}
+
+  
 // --- Ligas principales de baloncesto ---
-const mainLeagues = [
+const mainBasketLeagues = [
   "Liga Endesa","Liga Femenina Endesa","Betclic Élite","Pro A","Ligue Féminine de Basketball",
   "LBA Serie A","Serie A1 Femminile","easyCredit BBL","DBBL","BSL","Greek Basket League","LKL",
   "CBA","WCBA","NBB","Liga de Basquete Feminino","Liga Nacional de Básquet","Liga Femenina de Básquetbol",
@@ -61,9 +168,6 @@ const mainLeagues = [
   "EuroBasket","EuroBasket Women","FIBA AmeriCup","FIBA Women’s AmeriCup","FIBA Asia Cup","FIBA Women’s Asia Cup",
   "FIBA AfroBasket","FIBA Women’s AfroBasket","FIBA Oceania Championship"
 ];
-
-// Map para evitar notificaciones repetidas
-const notifiedGames = new Map();
 
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
@@ -103,9 +207,9 @@ function getLiveBasketEvents() {
           const key = `${home} vs ${away}`;
 
           // 🔎 Filtrar solo ligas principales
-          if (!mainLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
+          if (!mainBasketLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
-          let state = notifiedGames.get(key) || {
+          let state = notifiedBasketGames.get(key) || {
             q4_started: false,
             q4_blowout: false,
             ot: false,
@@ -143,11 +247,9 @@ Liga: ${league} | País: ${country}
 
               state.q4_blowout = true;
               state.initialTotal = totalPoints;
-            } else {
-              state.q4_blowout = false; // ignorar si no cumple
             }
 
-            notifiedGames.set(key, state);
+            notifiedBasketGames.set(key, state);
           }
 
           // --- Prórroga ---
@@ -172,7 +274,7 @@ Liga: ${league} | País: ${country}
             state.ot = true;
             state.initialTotal = totalPoints;
             state.suggestionRange = { min: suggestionMin, max: suggestionMax };
-            notifiedGames.set(key, state);
+            notifiedBasketGames.set(key, state);
           }
 
           // --- Evaluación final ---
@@ -187,7 +289,6 @@ Liga: ${league} | País: ${country}
             state.final = true;
             const finalTotal = pointsHome + pointsAway;
 
-            // Comparación de prórroga
             if (state.suggestionRange) {
               const { min, max } = state.suggestionRange;
               const won = finalTotal >= min && finalTotal <= max;
@@ -200,7 +301,6 @@ Liga: ${league} | País: ${country}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
             }
 
-            // Comparación de último cuarto desbalanceado
             if (state.q4_blowout) {
               const initialTotal = state.initialTotal || 0;
               const won = finalTotal < initialTotal;
@@ -213,7 +313,7 @@ Liga: ${league} | País: ${country}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
             }
 
-            notifiedGames.set(key, state);
+            notifiedBasketGames.set(key, state);
           }
         });
       } catch (err) {
@@ -225,131 +325,6 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-
-// Equipos fuertes de Europa y Sudamérica
-const strongTeams = [
-  // Europa
-  "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
-  "Liverpool","Chelsea","Juventus","Inter","AC Milan",
-  // Argentina
-  "Boca Juniors","River Plate",
-  // Brasil
-  "Flamengo","Palmeiras","Corinthians","São Paulo",
-  // Chile
-  "Colo-Colo","Universidad de Chile",
-  // Colombia
-  "Atlético Nacional","Millonarios",
-  // Ecuador
-  "Barcelona SC","LDU Quito","Independiente del Valle",
-  // Uruguay
-  "Peñarol","Nacional",
-  // Paraguay
-  "Olimpia","Cerro Porteño",
-  // Perú
-  "Alianza Lima","Universitario",
-  // Bolivia
-  "Bolívar","The Strongest",
-  // Venezuela
-  "Caracas FC","Deportivo Táchira"
-];
-
-// Ligas principales (filtrado)
-const mainFootballLeagues = [
-  "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
-  "Brasileirão","Argentine Primera División","Primera A Colombia","LigaPro Ecuador",
-  "Primera División Uruguay","Primera División Chile","Primera División Paraguay",
-  "Primera División Perú","Primera División Bolivia","Primera División Venezuela",
-  "UEFA Champions League","Copa Libertadores","Copa Sudamericana",
-  "FIFA World Cup","Copa América","Euro"
-];
-
-// Map para evitar notificaciones repetidas
-const notifiedStrongTeams = new Map();
-
-// Limpieza de nombres (evita U21, B, II, reservas, etc.)
-function normalizeTeamName(name) {
-  return name
-    .replace(/u\d+|b|ii|reserves|sub/gi, "")
-    .trim();
-}
-
-function getLiveFootballEvents() {
-  const options = {
-    method: "GET",
-    hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/sport/football/events/live`,
-    headers: {
-      "x-rapidapi-key": API_SPORT_KEY,
-      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
-    }
-  };
-
-  const req = https.request(options, res => {
-    let data = "";
-    res.on("data", chunk => (data += chunk));
-    res.on("end", () => {
-      try {
-        const json = JSON.parse(data);
-        const games = json.data || json.events || [];
-
-        games.forEach(game => {
-          const homeRaw = game.homeTeam?.name || "";
-          const awayRaw = game.awayTeam?.name || "";
-          const home = normalizeTeamName(homeRaw);
-          const away = normalizeTeamName(awayRaw);
-
-          const league = game.tournament?.name || "Liga desconocida";
-          const status = game.status?.description || "";
-          const pointsHome = game.homeScore?.current ?? 0;
-          const pointsAway = game.awayScore?.current ?? 0;
-
-          // 🔎 Filtrar solo ligas principales
-          if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
-
-          // 🔎 Verificar si es primer tiempo
-          const statusNorm = status.toLowerCase();
-          const isFirstHalf = statusNorm.includes("1st") || statusNorm.includes("first") || statusNorm.includes("ht");
-
-          if (!isFirstHalf) return;
-
-          const isStrongHome = strongTeams.some(t => home.toLowerCase() === t.toLowerCase());
-          const isStrongAway = strongTeams.some(t => away.toLowerCase() === t.toLowerCase());
-
-          const key = `${home} vs ${away}`;
-
-          // 🔎 Evitar notificación repetida
-          if (notifiedStrongTeams.has(key)) return;
-
-          if (isStrongHome && pointsHome < pointsAway) {
-            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
-${homeRaw} vs ${awayRaw}
-Liga: ${league}
-Estado: ${status}
-Marcador: ${pointsHome} - ${pointsAway}`);
-            notifiedStrongTeams.set(key, true);
-          }
-
-          if (isStrongAway && pointsAway < pointsHome) {
-            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
-${homeRaw} vs ${awayRaw}
-Liga: ${league}
-Estado: ${status}
-Marcador: ${pointsHome} - ${pointsAway}`);
-            notifiedStrongTeams.set(key, true);
-          }
-        });
-      } catch (err) {
-        console.error("❌ Error parseando respuesta fútbol:", err.message);
-      }
-    });
-  });
-
-  req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
-  req.end();
-}
-
-
-const notifiedHockeyGames = new Map();
 
 function getLiveHockeyEvents() {
   const options = {
@@ -370,11 +345,6 @@ function getLiveHockeyEvents() {
         const json = JSON.parse(data);
         const games = json.data || json.events || [];
 
-        if (!games.length) {
-          console.log("📭 No hay partidos de hockey en vivo.");
-          return;
-        }
-
         games.forEach(game => {
           const home = game.homeTeam?.name;
           const away = game.awayTeam?.name;
@@ -383,7 +353,6 @@ function getLiveHockeyEvents() {
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
 
-          // 🔎 Filtrar solo NHL
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
@@ -406,8 +375,6 @@ Marcador: ${goalsHome} - ${goalsAway}`);
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
-
-
 
 function getLocalTime() {
   const now = new Date();
