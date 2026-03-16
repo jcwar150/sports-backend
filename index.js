@@ -219,6 +219,21 @@ Liga: ${league} | País: ${country}
   req.end();
 }
 // Lista de equipos fuertes
+const strongTeams = [
+  "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
+  "Liverpool","Chelsea","Juventus","Inter","AC Milan"
+];
+
+// Map para evitar notificaciones repetidas
+const notifiedStrongTeams = new Map();
+
+// Función para limpiar nombres (evita U21, B, II, reservas, etc.)
+function normalizeTeamName(name) {
+  return name
+    .replace(/u\d+|b|ii|reserves|sub/gi, "") // elimina sufijos
+    .trim();
+}
+
 function getLiveFootballEvents() {
   const options = {
     method: "GET",
@@ -239,8 +254,11 @@ function getLiveFootballEvents() {
         const games = json.data || json.events || [];
 
         games.forEach(game => {
-          const home = game.homeTeam?.name;
-          const away = game.awayTeam?.name;
+          const homeRaw = game.homeTeam?.name || "";
+          const awayRaw = game.awayTeam?.name || "";
+          const home = normalizeTeamName(homeRaw);
+          const away = normalizeTeamName(awayRaw);
+
           const league = game.tournament?.name || "Liga desconocida";
           const status = game.status?.description || "";
           const pointsHome = game.homeScore?.current ?? 0;
@@ -251,28 +269,30 @@ function getLiveFootballEvents() {
 
           if (!isFirstHalf) return;
 
-          const strongTeams = [
-            "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
-            "Liverpool","Chelsea","Juventus","Inter","AC Milan"
-          ];
+          const isStrongHome = strongTeams.some(t => home.toLowerCase() === t.toLowerCase());
+          const isStrongAway = strongTeams.some(t => away.toLowerCase() === t.toLowerCase());
 
-          const isStrongHome = strongTeams.some(t => home.toLowerCase().includes(t.toLowerCase()));
-          const isStrongAway = strongTeams.some(t => away.toLowerCase().includes(t.toLowerCase()));
+          const key = `${home} vs ${away}`;
+
+          // 🔎 Evitar notificación repetida
+          if (notifiedStrongTeams.has(key)) return;
 
           if (isStrongHome && pointsHome < pointsAway) {
             sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
-${home} vs ${away}
+${homeRaw} vs ${awayRaw}
 Liga: ${league}
 Estado: ${status}
 Marcador: ${pointsHome} - ${pointsAway}`);
+            notifiedStrongTeams.set(key, true);
           }
 
           if (isStrongAway && pointsAway < pointsHome) {
             sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
-${home} vs ${away}
+${homeRaw} vs ${awayRaw}
 Liga: ${league}
 Estado: ${status}
 Marcador: ${pointsHome} - ${pointsAway}`);
+            notifiedStrongTeams.set(key, true);
           }
         });
       } catch (err) {
