@@ -218,19 +218,50 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-// Lista de equipos fuertes
+// Equipos fuertes de Europa y Sudamérica
 const strongTeams = [
+  // Europa
   "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
-  "Liverpool","Chelsea","Juventus","Inter","AC Milan"
+  "Liverpool","Chelsea","Juventus","Inter","AC Milan",
+  // Argentina
+  "Boca Juniors","River Plate",
+  // Brasil
+  "Flamengo","Palmeiras","Corinthians","São Paulo",
+  // Chile
+  "Colo-Colo","Universidad de Chile",
+  // Colombia
+  "Atlético Nacional","Millonarios",
+  // Ecuador
+  "Barcelona SC","LDU Quito","Independiente del Valle",
+  // Uruguay
+  "Peñarol","Nacional",
+  // Paraguay
+  "Olimpia","Cerro Porteño",
+  // Perú
+  "Alianza Lima","Universitario",
+  // Bolivia
+  "Bolívar","The Strongest",
+  // Venezuela
+  "Caracas FC","Deportivo Táchira"
+];
+
+// Ligas principales (filtrado)
+const mainFootballLeagues = [
+  "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
+  "Brasileirão","Argentine Primera División","Primera A Colombia","LigaPro Ecuador",
+  "Primera División Uruguay","Primera División Chile","Primera División Paraguay",
+  "Primera División Perú","Primera División Bolivia","Primera División Venezuela",
+  "UEFA Champions League","Copa Libertadores","Copa Sudamericana",
+  "FIFA World Cup","Copa América","Euro"
 ];
 
 // Map para evitar notificaciones repetidas
 const notifiedStrongTeams = new Map();
 
-// Función para limpiar nombres (evita U21, B, II, reservas, etc.)
+// Limpieza de nombres (evita U21, B, II, reservas, etc.)
 function normalizeTeamName(name) {
   return name
-    .replace(/u\d+|b|ii|reserves|sub/gi, "") // elimina sufijos
+    .replace(/u\d+|b|ii|reserves|sub/gi, "")
     .trim();
 }
 
@@ -264,6 +295,10 @@ function getLiveFootballEvents() {
           const pointsHome = game.homeScore?.current ?? 0;
           const pointsAway = game.awayScore?.current ?? 0;
 
+          // 🔎 Filtrar solo ligas principales
+          if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
+
+          // 🔎 Verificar si es primer tiempo
           const statusNorm = status.toLowerCase();
           const isFirstHalf = statusNorm.includes("1st") || statusNorm.includes("first") || statusNorm.includes("ht");
 
