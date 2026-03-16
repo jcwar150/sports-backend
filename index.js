@@ -20,17 +20,6 @@ let dailyStats = {
   total: { won: 0, lost: 0 }
 };
 
-const mainLeagues = [
-  "Liga Endesa","Liga Femenina Endesa","Betclic Élite","Pro A","Ligue Féminine de Basketball",
-  "LBA Serie A","Serie A1 Femminile","easyCredit BBL","DBBL","BSL","Greek Basket League","LKL",
-  "CBA","WCBA","NBB","Liga de Basquete Feminino","Liga Nacional de Básquet","Liga Femenina de Básquetbol",
-  "Liga Uruguaya de Básquetbol","Liga Femenina de Básquetbol","NBL","WNBL","B.League","NBA","WNBA","NCAA","G-League",
-  "EuroLeague","EuroCup","Basketball Champions League","EuroLeague Women","Basketball Champions League Americas","Liga Sudamericana de Clubes",
-  "FIBA Basketball World Cup","FIBA Women’s Basketball World Cup","Olympic Basketball Tournament",
-  "EuroBasket","EuroBasket Women","FIBA AmeriCup","FIBA Women’s AmeriCup","FIBA Asia Cup","FIBA Women’s Asia Cup",
-  "FIBA AfroBasket","FIBA Women’s AfroBasket","FIBA Oceania Championship"
-];
-
 function resetDailyGamesIfNeeded() {
   const today = new Date().toISOString().split("T")[0];
   if (today !== currentDate) {
@@ -61,6 +50,21 @@ async function sendNotification(message) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
+// --- Ligas principales de baloncesto ---
+const mainLeagues = [
+  "Liga Endesa","Liga Femenina Endesa","Betclic Élite","Pro A","Ligue Féminine de Basketball",
+  "LBA Serie A","Serie A1 Femminile","easyCredit BBL","DBBL","BSL","Greek Basket League","LKL",
+  "CBA","WCBA","NBB","Liga de Basquete Feminino","Liga Nacional de Básquet","Liga Femenina de Básquetbol",
+  "Liga Uruguaya de Básquetbol","Liga Femenina de Básquetbol","NBL","WNBL","B.League","NBA","WNBA","NCAA","G-League",
+  "EuroLeague","EuroCup","Basketball Champions League","EuroLeague Women","Basketball Champions League Americas","Liga Sudamericana de Clubes",
+  "FIBA Basketball World Cup","FIBA Women’s Basketball World Cup","Olympic Basketball Tournament",
+  "EuroBasket","EuroBasket Women","FIBA AmeriCup","FIBA Women’s AmeriCup","FIBA Asia Cup","FIBA Women’s Asia Cup",
+  "FIBA AfroBasket","FIBA Women’s AfroBasket","FIBA Oceania Championship"
+];
+
+// Map para evitar notificaciones repetidas
+const notifiedGames = new Map();
+
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
 
@@ -97,6 +101,9 @@ function getLiveBasketEvents() {
           const pointsAway = game.awayScore?.current ?? 0;
           const diff = Math.abs(pointsHome - pointsAway);
           const key = `${home} vs ${away}`;
+
+          // 🔎 Filtrar solo ligas principales
+          if (!mainLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
           let state = notifiedGames.get(key) || {
             q4_started: false,
@@ -218,6 +225,7 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
+
 // Equipos fuertes de Europa y Sudamérica
 const strongTeams = [
   // Europa
