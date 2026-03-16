@@ -58,7 +58,7 @@ async function sendNotification(message) {
   } catch (err) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
-
+}
 // --- Equipos fuertes ---
 const strongTeams = [
   "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
@@ -70,7 +70,6 @@ const strongTeams = [
   "Bolívar","The Strongest","Caracas FC","Deportivo Táchira"
 ];
 
-// --- Ligas principales ---
 const mainFootballLeagues = [
   "Premier League","LaLiga","Serie A","Bundesliga","Ligue 1",
   "Brasileirão","Argentine Primera División","Primera A Colombia","LigaPro Ecuador",
@@ -80,12 +79,10 @@ const mainFootballLeagues = [
   "FIFA World Cup","Copa América","Euro"
 ];
 
-// --- Normalización de nombres ---
 function normalizeTeamName(name) {
   return name.replace(/u\d+|b|ii|reserves|sub/gi, "").trim();
 }
 
-// --- Lógica de fútbol ---
 function getLiveFootballEvents() {
   const options = {
     method: "GET",
@@ -155,8 +152,6 @@ Marcador: ${pointsHome} - ${pointsAway}`);
   req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
   req.end();
 }
-
-  
 // --- Ligas principales de baloncesto ---
 const mainBasketLeagues = [
   "Liga Endesa","Liga Femenina Endesa","Betclic Élite","Pro A","Ligue Féminine de Basketball",
@@ -206,7 +201,6 @@ function getLiveBasketEvents() {
           const diff = Math.abs(pointsHome - pointsAway);
           const key = `${home} vs ${away}`;
 
-          // 🔎 Filtrar solo ligas principales
           if (!mainBasketLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
           let state = notifiedBasketGames.get(key) || {
@@ -325,8 +319,9 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-
 function getLiveHockeyEvents() {
+  resetDailyGamesIfNeeded();
+
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -353,6 +348,7 @@ function getLiveHockeyEvents() {
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
 
+          // 🔎 Filtrar solo NHL
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
@@ -374,78 +370,41 @@ Marcador: ${goalsHome} - ${goalsAway}`);
 
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
-}
-
-function getLocalTime() {
+// --- Control de horario de funcionamiento ---
+// Por ejemplo: solo entre 12:00 y 23:59
+function isWithinOperatingHours() {
   const now = new Date();
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Guayaquil",
-    hour: "numeric",
-    hour12: false
-  });
-  const parts = formatter.formatToParts(now);
-  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
-  const day = now.getDay(); // 0 = domingo, 6 = sábado
-  return { hour, day };
+  const hour = now.getHours();
+  return hour >= 12 && hour <= 23;
 }
 
+// --- Scheduler para ejecutar cada cierto tiempo ---
 setInterval(() => {
-  const { hour, day } = getLocalTime();
-
-  let startHour = 12;
-  let endHour = 24;
-
-  // Fines de semana: horario distinto
-  if (day === 0 || day === 6) {
-    startHour = 9;
-    endHour = 22;
+  if (!isWithinOperatingHours()) {
+    console.log("⏱️ Fuera del horario de funcionamiento, no se ejecutan chequeos.");
+    return;
   }
 
-  if (hour >= startHour && hour < endHour) {
-    console.log(`🔄 [${hour}h Ecuador] Buscando partidos...`);
-    getLiveBasketEvents();
-    getLiveFootballEvents();
-    getLiveHockeyEvents();
-  } else {
-    console.log(`⏸ [${hour}h Ecuador] Fuera de horario (${startHour}h-${endHour}h), no se hacen búsquedas.`);
-  }
-}, 3 * 60 * 1000); // cada 3 minutos
+  console.log("⏱️ Ejecutando chequeo de eventos en vivo...");
+  getLiveFootballEvents();
+  getLiveBasketEvents();
+  getLiveHockeyEvents();
+}, 3*60 * 1000); // cada 60 segundos
+
+// --- Resumen diario al final del día ---
 function sendDailySummary() {
-  const calcPercent = (won, lost) => {
-    const total = won + lost;
-    return total === 0 ? "0%" : ((won / total) * 100).toFixed(1) + "%";
-  };
+  const summary = `📊 Resumen diario (${currentDate})
+🏀 Blowouts: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}
+⏱️ Overtimes: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}
+📈 Totales: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}`;
 
-  const msg = `📊 Resumen del día (${currentDate})
-- Prórroga Basket: Ganados ${dailyStats.overtime.won}, Perdidos ${dailyStats.overtime.lost}, %Ganados ${calcPercent(dailyStats.overtime.won, dailyStats.overtime.lost)}
-- Desbalanceados Basket: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
-- Total Basket: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}
-⚽ Fútbol: Se notificaron partidos con corners ≤2 o remates ≤10 en HT, y se enviaron totales al FT.
-🏒 Hockey: Se notificaron partidos ajustados en el 3rd period (diferencia ≤3) y resultados finales.`;
-
-  sendNotification(msg);
+  sendNotification(summary);
 }
 
-// Ejecutar resumen diario a las 23:59
+// Ejecutar resumen diario a medianoche
 setInterval(() => {
   const now = new Date();
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Guayaquil",
-    hour: "numeric",
-    minute: "numeric",
-    hour12: false
-  });
-  const parts = formatter.formatToParts(now);
-  const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
-  const minute = parseInt(parts.find(p => p.type === "minute").value, 10);
-
-  if (hour === 23 && minute === 59) {
+  if (now.getHours() === 0 && now.getMinutes() === 0) {
     sendDailySummary();
   }
-}, 60 * 1000); // cada minuto
-
-
-
-
-
-
+}, 60 * 1000); // chequea cada minuto
