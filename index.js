@@ -228,7 +228,7 @@ function getLiveBasketEvents() {
               const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
               const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
               const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
-              const avgPrevQuarters = (q1 + q2 + q3) / 3;
+              const avgPrevQuarters = ((q1 + q2 + q3) / 3)-5;
               const suggestion = totalPoints + avgPrevQuarters;
 
               sendNotification(`⚡ Último cuarto desbalanceado
