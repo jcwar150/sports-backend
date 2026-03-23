@@ -325,7 +325,7 @@ function getLiveHockeyEvents() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/sports`,
+    path: `/api/v1/sport/ice-hockey/events/live`, // 👈 ya con el slug correcto
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -338,29 +338,42 @@ function getLiveHockeyEvents() {
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
+        const games = json.data || json.events || [];
 
-        console.log("📌 Lista de deportes disponibles en sportapi7:");
-        // Aquí imprimes todo para ver cómo aparece hockey/NHL
-        console.log(JSON.stringify(json, null, 2));
+        games.forEach(game => {
+          const home = game.homeTeam?.name;
+          const away = game.awayTeam?.name;
+          const league = game.tournament?.name || "";
+          const status = game.status?.description || "";
+          const goalsHome = game.homeScore?.current ?? 0;
+          const goalsAway = game.awayScore?.current ?? 0;
 
-        // Si quieres filtrar directamente hockey:
-        const hockeySport = (json.data || json.sports || []).find(sport =>
-          sport.name.toLowerCase().includes("hockey")
-        );
+          // Filtra solo NHL
+          if (!league.toLowerCase().includes("nhl")) return;
 
-        if (hockeySport) {
-          console.log("✅ Slug de hockey encontrado:", hockeySport.slug || hockeySport.id);
-        } else {
-          console.log("⚠️ No se encontró hockey en la lista, revisa la salida completa.");
-        }
+          // Calcula diferencia de goles
+          const diff = Math.abs(goalsHome - goalsAway);
+          if (diff > 2) return; // solo partidos con diferencia de 2 o menos
 
+          const key = `${home} vs ${away}`;
+          if (notifiedHockeyGames.has(key)) return; // evita notificación repetida
+
+          sendNotification(`🏒 NHL en vivo
+${home} vs ${away}
+Liga: ${league}
+Estado: ${status}
+Marcador: ${goalsHome} - ${goalsAway}
+⚡ Diferencia ajustada: ${diff} goles`);
+
+          notifiedHockeyGames.set(key, true);
+        });
       } catch (err) {
-        console.error("❌ Error parseando respuesta deportes:", err.message);
+        console.error("❌ Error parseando respuesta hockey:", err.message);
       }
     });
   });
 
-  req.on("error", err => console.error("❌ Error en la petición deportes:", err.message));
+  req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
 
