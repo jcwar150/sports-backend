@@ -319,13 +319,13 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-function getLiveHockeyEvents() {
+function getHockeySlug() {
   resetDailyGamesIfNeeded();
 
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/sport/icehockey/events/live`,
+    path: `/api/v1/sports`,
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -338,38 +338,32 @@ function getLiveHockeyEvents() {
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
-        const games = json.data || json.events || [];
 
-        games.forEach(game => {
-          const home = game.homeTeam?.name;
-          const away = game.awayTeam?.name;
-          const league = game.tournament?.name || "";
-          const status = game.status?.description || "";
-          const goalsHome = game.homeScore?.current ?? 0;
-          const goalsAway = game.awayScore?.current ?? 0;
+        console.log("📌 Lista de deportes disponibles en sportapi7:");
+        // Aquí imprimes todo para ver cómo aparece hockey/NHL
+        console.log(JSON.stringify(json, null, 2));
 
-          if (!league.toLowerCase().includes("nhl")) return;
+        // Si quieres filtrar directamente hockey:
+        const hockeySport = (json.data || json.sports || []).find(sport =>
+          sport.name.toLowerCase().includes("hockey")
+        );
 
-          const key = `${home} vs ${away}`;
-          if (notifiedHockeyGames.has(key)) return;
+        if (hockeySport) {
+          console.log("✅ Slug de hockey encontrado:", hockeySport.slug || hockeySport.id);
+        } else {
+          console.log("⚠️ No se encontró hockey en la lista, revisa la salida completa.");
+        }
 
-          sendNotification(`🏒 NHL en vivo
-${home} vs ${away}
-Liga: ${league}
-Estado: ${status}
-Marcador: ${goalsHome} - ${goalsAway}`);
-
-          notifiedHockeyGames.set(key, true);
-        });
       } catch (err) {
-        console.error("❌ Error parseando respuesta hockey:", err.message);
+        console.error("❌ Error parseando respuesta deportes:", err.message);
       }
     });
   });
 
-  req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
+  req.on("error", err => console.error("❌ Error en la petición deportes:", err.message));
   req.end();
 }
+
 
 // --- Obtener hora local en Ecuador ---
 function getLocalTime() {
