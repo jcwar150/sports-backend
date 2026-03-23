@@ -325,7 +325,7 @@ function getLiveHockeyEvents() {
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/sport/ice-hockey/events/live`, // 👈 ya con el slug correcto
+    path: `/api/v1/sport/ice-hockey/events/live`, // 👈 slug correcto
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -351,6 +351,11 @@ function getLiveHockeyEvents() {
           // Filtra solo NHL
           if (!league.toLowerCase().includes("nhl")) return;
 
+          // Verifica que esté en el último periodo
+          const currentPeriod = game.period?.current || "";
+          const totalPeriods = game.period?.total || 3; // normalmente 3 en hockey
+          if (currentPeriod !== totalPeriods) return;
+
           // Calcula diferencia de goles
           const diff = Math.abs(goalsHome - goalsAway);
           if (diff > 2) return; // solo partidos con diferencia de 2 o menos
@@ -358,7 +363,7 @@ function getLiveHockeyEvents() {
           const key = `${home} vs ${away}`;
           if (notifiedHockeyGames.has(key)) return; // evita notificación repetida
 
-          sendNotification(`🏒 NHL en vivo
+          sendNotification(`🏒 NHL en vivo - Último periodo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
@@ -376,6 +381,7 @@ Marcador: ${goalsHome} - ${goalsAway}
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
+
 
 
 // --- Obtener hora local en Ecuador ---
