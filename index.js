@@ -319,7 +319,7 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
-function getHockeySlug() {
+function getLiveHockeyEvents() {
   resetDailyGamesIfNeeded();
 
   const options = {
