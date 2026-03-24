@@ -17,6 +17,11 @@ const notifiedFootballGames = new Map();
 const notifiedBasketGames = new Map();
 const notifiedHockeyGames = new Map();
 
+// --- Historial de partidos ---
+let footballHistory = [];
+let basketHistory = [];
+let hockeyHistory = [];
+
 // --- Control de fecha y estadísticas ---
 let currentDate = new Date().toISOString().split("T")[0];
 let dailyStats = {
@@ -32,6 +37,9 @@ function resetDailyGamesIfNeeded() {
     notifiedFootballGames.clear();
     notifiedBasketGames.clear();
     notifiedHockeyGames.clear();
+    footballHistory = [];
+    basketHistory = [];
+    hockeyHistory = [];
     currentDate = today;
   }
 }
@@ -59,7 +67,30 @@ async function sendNotification(message) {
     console.error("❌ Error enviando notificación:", err.response?.data || err.message);
   }
 }
-// --- Equipos fuertes ---
+
+// --- Guardar partidos finalizados en historial ---
+function saveToHistory(game, sport) {
+  const record = {
+    home: game.homeTeam?.name,
+    away: game.awayTeam?.name,
+    league: game.tournament?.name || "",
+    country: game.tournament?.region?.name || "",
+    pointsHome: game.homeScore?.current ?? 0,
+    pointsAway: game.awayScore?.current ?? 0,
+    status: game.status?.description || ""
+  };
+
+  if (sport === "football") footballHistory.push(record);
+  if (sport === "basket") basketHistory.push(record);
+  if (sport === "hockey") hockeyHistory.push(record);
+}
+
+// --- Endpoints de historial ---
+app.get("/history-football", (req, res) => res.json({ games: footballHistory }));
+app.get("/history-basket", (req, res) => res.json({ games: basketHistory }));
+app.get("/history-hockey", (req, res) => res.json({ games: hockeyHistory }));
+
+// --- Arrays de ligas y equipos ---
 const strongTeams = [
   "Barcelona","Real Madrid","Bayern Munich","PSG","Manchester City",
   "Liverpool","Chelsea","Juventus","Inter","AC Milan",
@@ -79,10 +110,18 @@ const mainFootballLeagues = [
   "FIFA World Cup","Copa América","Euro"
 ];
 
-function normalizeTeamName(name) {
-  return name.replace(/u\d+|b|ii|reserves|sub/gi, "").trim();
-}
+const mainBasketLeagues = [
+  "Liga Endesa","Liga Femenina Endesa","Betclic Élite","Pro A","Ligue Féminine de Basketball",
+  "LBA Serie A","Serie A1 Femminile","easyCredit BBL","DBBL","BSL","Greek Basket League","LKL",
+  "CBA","WCBA","NBB","Liga de Basquete Feminino","Liga Nacional de Básquet","Liga Femenina de Básquetbol",
+  "Liga Uruguaya de Básquetbol","Liga Femenina de Básquetbol","NBL","WNBL","B.League","NBA","WNBA","NCAA","G-League",
+  "EuroLeague","EuroCup","Basketball Champions League","EuroLeague Women","Basketball Champions League Americas","Liga Sudamericana de Clubes",
+  "FIBA Basketball World Cup","FIBA Women’s Basketball World Cup","Olympic Basketball Tournament",
+  "EuroBasket","EuroBasket Women","FIBA AmeriCup","FIBA Women’s AmeriCup","FIBA Asia Cup","FIBA Women’s Asia Cup",
+  "FIBA AfroBasket","FIBA Women’s AfroBasket","FIBA Oceania Championship"
+];
 
+// --- Función Fútbol ---
 function getLiveFootballEvents() {
   const options = {
     method: "GET",
@@ -105,9 +144,6 @@ function getLiveFootballEvents() {
         games.forEach(game => {
           const homeRaw = game.homeTeam?.name || "";
           const awayRaw = game.awayTeam?.name || "";
-          const home = normalizeTeamName(homeRaw);
-          const away = normalizeTeamName(awayRaw);
-
           const league = game.tournament?.name || "Liga desconocida";
           const status = game.status?.description || "";
           const pointsHome = game.homeScore?.current ?? 0;
@@ -115,32 +151,34 @@ function getLiveFootballEvents() {
 
           if (!mainFootballLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
-          const statusNorm = status.toLowerCase();
-          const isFirstHalf = statusNorm.includes("1st") || statusNorm.includes("first") || statusNorm.includes("ht");
-          if (!isFirstHalf) return;
-
-          const isStrongHome = strongTeams.some(t => home.toLowerCase() === t.toLowerCase());
-          const isStrongAway = strongTeams.some(t => away.toLowerCase() === t.toLowerCase());
-
-          const key = `${home} vs ${away}`;
+          const key = `${homeRaw} vs ${awayRaw}`;
           if (notifiedFootballGames.has(key)) return;
 
-          if (isStrongHome && pointsHome < pointsAway) {
-            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
+          const statusNorm = status.toLowerCase();
+          const isStrongHome = strongTeams.some(t => homeRaw.toLowerCase() === t.toLowerCase());
+          const isStrongAway = strongTeams.some(t => awayRaw.toLowerCase() === t.toLowerCase());
+
+          // --- Notificación: equipo fuerte perdiendo al descanso ---
+          if (statusNorm.includes("ht") || statusNorm.includes("half")) {
+            if (isStrongHome && pointsHome < pointsAway) {
+              sendNotification(`⚽ Equipo fuerte perdiendo al descanso
 ${homeRaw} vs ${awayRaw}
 Liga: ${league}
-Estado: ${status}
 Marcador: ${pointsHome} - ${pointsAway}`);
-            notifiedFootballGames.set(key, true);
+              notifiedFootballGames.set(key, true);
+            }
+            if (isStrongAway && pointsAway < pointsHome) {
+              sendNotification(`⚽ Equipo fuerte perdiendo al descanso
+${homeRaw} vs ${awayRaw}
+Liga: ${league}
+Marcador: ${pointsHome} - ${pointsAway}`);
+              notifiedFootballGames.set(key, true);
+            }
           }
 
-          if (isStrongAway && pointsAway < pointsHome) {
-            sendNotification(`⚠️ Equipo fuerte perdiendo al descanso
-${homeRaw} vs ${awayRaw}
-Liga: ${league}
-Estado: ${status}
-Marcador: ${pointsHome} - ${pointsAway}`);
-            notifiedFootballGames.set(key, true);
+          // --- Guardar en historial si terminó ---
+          if (statusNorm.includes("finished") || statusNorm.includes("ended") || statusNorm.includes("final")) {
+            saveToHistory(game, "football");
           }
         });
       } catch (err) {
@@ -152,17 +190,6 @@ Marcador: ${pointsHome} - ${pointsAway}`);
   req.on("error", err => console.error("❌ Error en la petición fútbol:", err.message));
   req.end();
 }
-// --- Ligas principales de baloncesto ---
-const mainBasketLeagues = [
-  "Liga Endesa","Liga Femenina Endesa","Betclic Élite","Pro A","Ligue Féminine de Basketball",
-  "LBA Serie A","Serie A1 Femminile","easyCredit BBL","DBBL","BSL","Greek Basket League","LKL",
-  "CBA","WCBA","NBB","Liga de Basquete Feminino","Liga Nacional de Básquet","Liga Femenina de Básquetbol",
-  "Liga Uruguaya de Básquetbol","Liga Femenina de Básquetbol","NBL","WNBL","B.League","NBA","WNBA","NCAA","G-League",
-  "EuroLeague","EuroCup","Basketball Champions League","EuroLeague Women","Basketball Champions League Americas","Liga Sudamericana de Clubes",
-  "FIBA Basketball World Cup","FIBA Women’s Basketball World Cup","Olympic Basketball Tournament",
-  "EuroBasket","EuroBasket Women","FIBA AmeriCup","FIBA Women’s AmeriCup","FIBA Asia Cup","FIBA Women’s Asia Cup",
-  "FIBA AfroBasket","FIBA Women’s AfroBasket","FIBA Oceania Championship"
-];
 
 function getLiveBasketEvents() {
   resetDailyGamesIfNeeded();
@@ -201,6 +228,7 @@ function getLiveBasketEvents() {
           const diff = Math.abs(pointsHome - pointsAway);
           const key = `${home} vs ${away}`;
 
+          // Filtra solo ligas principales
           if (!mainBasketLeagues.some(l => league.toLowerCase().includes(l.toLowerCase()))) return;
 
           let state = notifiedBasketGames.get(key) || {
@@ -228,7 +256,7 @@ function getLiveBasketEvents() {
               const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
               const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
               const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
-              const avgPrevQuarters = ((q1 + q2 + q3) / 3)-5;
+              const avgPrevQuarters = ((q1 + q2 + q3) / 3) - 5;
               const suggestion = totalPoints + avgPrevQuarters;
 
               sendNotification(`⚡ Último cuarto desbalanceado
@@ -307,6 +335,9 @@ Liga: ${league} | País: ${country}
 📈 Resultado: ${won ? "Ganaba con el estimado" : "No entró en el rango"}`);
             }
 
+            // --- Guardar en historial ---
+            saveToHistory(game, "basket");
+
             notifiedBasketGames.set(key, state);
           }
         });
@@ -319,13 +350,14 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
+
 function getLiveHockeyEvents() {
   resetDailyGamesIfNeeded();
 
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
-    path: `/api/v1/sport/ice-hockey/events/live`, // 👈 slug correcto
+    path: `/api/v1/sport/ice-hockey/events/live`,
     headers: {
       "x-rapidapi-key": API_SPORT_KEY,
       "x-rapidapi-host": "sportapi7.p.rapidapi.com"
@@ -348,29 +380,32 @@ function getLiveHockeyEvents() {
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
 
-          // Filtra solo NHL
+          // --- Filtra solo NHL ---
           if (!league.toLowerCase().includes("nhl")) return;
 
-          // Verifica que esté en el último periodo
+          const key = `${home} vs ${away}`;
+          const statusNorm = status.toLowerCase();
+
+          // --- Notificación: último periodo con diferencia ≤2 ---
           const currentPeriod = game.period?.current || "";
           const totalPeriods = game.period?.total || 3; // normalmente 3 en hockey
-          if (currentPeriod !== totalPeriods) return;
-
-          // Calcula diferencia de goles
-          const diff = Math.abs(goalsHome - goalsAway);
-          if (diff > 2) return; // solo partidos con diferencia de 2 o menos
-
-          const key = `${home} vs ${away}`;
-          if (notifiedHockeyGames.has(key)) return; // evita notificación repetida
-
-          sendNotification(`🏒 NHL en vivo - Último periodo
+          if (currentPeriod === totalPeriods) {
+            const diff = Math.abs(goalsHome - goalsAway);
+            if (diff <= 2 && !notifiedHockeyGames.has(key)) {
+              sendNotification(`🏒 NHL en vivo - Último periodo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
 Marcador: ${goalsHome} - ${goalsAway}
 ⚡ Diferencia ajustada: ${diff} goles`);
+              notifiedHockeyGames.set(key, true);
+            }
+          }
 
-          notifiedHockeyGames.set(key, true);
+          // --- Guardar en historial si terminó ---
+          if (statusNorm.includes("finished") || statusNorm.includes("ended") || statusNorm.includes("final")) {
+            saveToHistory(game, "hockey");
+          }
         });
       } catch (err) {
         console.error("❌ Error parseando respuesta hockey:", err.message);
@@ -381,8 +416,6 @@ Marcador: ${goalsHome} - ${goalsAway}
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
-
-
 
 // --- Obtener hora local en Ecuador ---
 function getLocalTime() {
@@ -433,8 +466,8 @@ function sendDailySummary() {
 - Desbalanceados Basket: Ganados ${dailyStats.blowout.won}, Perdidos ${dailyStats.blowout.lost}, %Ganados ${calcPercent(dailyStats.blowout.won, dailyStats.blowout.lost)}
 - Total Basket: Ganados ${dailyStats.total.won}, Perdidos ${dailyStats.total.lost}, %Ganados ${calcPercent(dailyStats.total.won, dailyStats.total.lost)}
 
-⚽ Fútbol: Se notificaron partidos con corners ≤2 o remates ≤10 en HT, y se enviaron totales al FT.
-🏒 Hockey: Se notificaron partidos ajustados en el 3rd period (diferencia ≤3) y resultados finales.`;
+⚽ Fútbol: Se notificaron partidos con equipos fuertes perdiendo al descanso y se guardaron finales en historial.
+🏒 Hockey: Se notificaron partidos ajustados en el último periodo y se guardaron finales en historial.`;
 
   sendNotification(msg);
 }
@@ -456,3 +489,7 @@ setInterval(() => {
     sendDailySummary();
   }
 }, 60 * 1000); // cada minuto
+
+
+
+
