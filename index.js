@@ -44,29 +44,54 @@ function resetDailyGamesIfNeeded() {
   }
 }
 
-// --- Notificaciones vía OneSignal ---
-async function sendNotification(message) {
-  try {
-    await axios.post(
-      "https://api.onesignal.com/notifications",
-      {
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: ["All"],
-        headings: { en: "📢 Deportes" },
-        contents: { en: message }
-      },
-      {
-        headers: {
-          Authorization: `Basic ${ONESIGNAL_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    console.log("📲 Notificación enviada:", message);
-  } catch (err) {
-    console.error("❌ Error enviando notificación:", err.response?.data || err.message);
-  }
+async function sendFootballNotification(message) {
+  await axios.post("https://api.onesignal.com/notifications", {
+    app_id: ONESIGNAL_APP_ID,
+    filters: [
+      { field: "tag", key: "football", relation: "=", value: "true" }
+    ],
+    headings: { en: "⚽ Fútbol" },
+    contents: { en: message }
+  }, {
+    headers: {
+      Authorization: `Basic ${ONESIGNAL_API_KEY}`,
+      "Content-Type": "application/json"
+    }
+  });
 }
+
+async function sendBasketNotification(message) {
+  await axios.post("https://api.onesignal.com/notifications", {
+    app_id: ONESIGNAL_APP_ID,
+    filters: [
+      { field: "tag", key: "basket", relation: "=", value: "true" }
+    ],
+    headings: { en: "🏀 Basket" },
+    contents: { en: message }
+  }, {
+    headers: {
+      Authorization: `Basic ${ONESIGNAL_API_KEY}`,
+      "Content-Type": "application/json"
+    }
+  });
+}
+
+async function sendHockeyNotification(message) {
+  await axios.post("https://api.onesignal.com/notifications", {
+    app_id: ONESIGNAL_APP_ID,
+    filters: [
+      { field: "tag", key: "hockey", relation: "=", value: "true" }
+    ],
+    headings: { en: "🏒 Hockey" },
+    contents: { en: message }
+  }, {
+    headers: {
+      Authorization: `Basic ${ONESIGNAL_API_KEY}`,
+      "Content-Type": "application/json"
+    }
+  });
+}
+
 
 // --- Guardar partidos finalizados en historial ---
 function saveToHistory(game, sport) {
