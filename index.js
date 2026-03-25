@@ -186,14 +186,14 @@ function getLiveFootballEvents() {
           // --- Notificación: equipo fuerte perdiendo al descanso ---
           if (statusNorm.includes("ht") || statusNorm.includes("half")) {
             if (isStrongHome && pointsHome < pointsAway) {
-              sendNotification(`⚽ Equipo fuerte perdiendo al descanso
+              sendFootballNotification(`⚽ Equipo fuerte perdiendo al descanso
 ${homeRaw} vs ${awayRaw}
 Liga: ${league}
 Marcador: ${pointsHome} - ${pointsAway}`);
               notifiedFootballGames.set(key, true);
             }
             if (isStrongAway && pointsAway < pointsHome) {
-              sendNotification(`⚽ Equipo fuerte perdiendo al descanso
+              sendFootballNotification(`⚽ Equipo fuerte perdiendo al descanso
 ${homeRaw} vs ${awayRaw}
 Liga: ${league}
 Marcador: ${pointsHome} - ${pointsAway}`);
@@ -284,7 +284,7 @@ function getLiveBasketEvents() {
               const avgPrevQuarters = ((q1 + q2 + q3) / 3) - 5;
               const suggestion = totalPoints + avgPrevQuarters;
 
-              sendNotification(`⚡ Último cuarto desbalanceado
+              sendBasketNotification(`⚡ Último cuarto desbalanceado
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 ⏱️ Estado: ${status} | Tiempo: ${timerVal}
@@ -311,7 +311,7 @@ Liga: ${league} | País: ${country}
             const suggestionMin = totalPoints + 22;
             const suggestionMax = totalPoints + 26;
 
-            sendNotification(`⏱️ Prórroga detectada
+            sendBasketNotification(`⏱️ Prórroga detectada
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -339,7 +339,7 @@ Liga: ${league} | País: ${country}
             if (state.suggestionRange) {
               const { min, max } = state.suggestionRange;
               const won = finalTotal >= min && finalTotal <= max;
-              sendNotification(`✅ Final del partido
+              sendBasketNotification(`✅ Final del partido
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -351,7 +351,7 @@ Liga: ${league} | País: ${country}
             if (state.q4_blowout) {
               const initialTotal = state.initialTotal || 0;
               const won = finalTotal < initialTotal;
-              sendNotification(`✅ Final del partido
+              sendBasketNotification(`✅ Final del partido
 ${home} vs ${away}
 Liga: ${league} | País: ${country}
 🏀 ${pointsHome} - ${pointsAway}
@@ -417,7 +417,7 @@ function getLiveHockeyEvents() {
           if (currentPeriod === totalPeriods) {
             const diff = Math.abs(goalsHome - goalsAway);
             if (diff <= 2 && !notifiedHockeyGames.has(key)) {
-              sendNotification(`🏒 NHL en vivo - Último periodo
+              sendHockeyNotification(`🏒 NHL en vivo - Último periodo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
@@ -494,7 +494,7 @@ function sendDailySummary() {
 ⚽ Fútbol: Se notificaron partidos con equipos fuertes perdiendo al descanso y se guardaron finales en historial.
 🏒 Hockey: Se notificaron partidos ajustados en el último periodo y se guardaron finales en historial.`;
 
-  sendNotification(msg);
+  sendHockeyNotification(msg);
 }
 
 // --- Ejecutar resumen diario a las 23:59 ---
