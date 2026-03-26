@@ -409,24 +409,19 @@ function getLiveHockeyEvents() {
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
-          const statusNorm = status.toLowerCase();
 
-          // --- Notificación: PRIMER periodo con diferencia ≤1 ---
-          const currentPeriod = game.period?.current || "";
-          if (String(currentPeriod).toLowerCase().includes("1")) {
-            const diff = Math.abs(goalsHome - goalsAway);
-            if (diff <= 1 && !notifiedHockeyGames.has(key)) {
-              sendHockeyNotification(`🏒 NHL en vivo - 1er periodo
+          // --- Notificación: TODOS los partidos en vivo ---
+          if (!notifiedHockeyGames.has(key)) {
+            sendHockeyNotification(`🏒 NHL en vivo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
-Marcador: ${goalsHome} - ${goalsAway}
-⚡ Diferencia ajustada: ${diff} goles`);
-              notifiedHockeyGames.set(key, true);
-            }
+Marcador: ${goalsHome} - ${goalsAway}`);
+            notifiedHockeyGames.set(key, true);
           }
 
           // --- Guardar en historial si terminó ---
+          const statusNorm = status.toLowerCase();
           if (
             statusNorm.includes("finished") ||
             statusNorm.includes("ended") ||
@@ -446,6 +441,7 @@ Marcador: ${goalsHome} - ${goalsAway}
   );
   req.end();
 }
+
 
 
 // --- Obtener hora local en Ecuador ---
