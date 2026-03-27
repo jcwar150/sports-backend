@@ -409,19 +409,27 @@ function getLiveHockeyEvents() {
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
+          const statusNorm = status.toLowerCase();
 
-          // --- Notificación: TODOS los partidos en vivo ---
-          if (!notifiedHockeyGames.has(key)) {
-            sendHockeyNotification(`🏒 NHL en vivo
+          // --- Notificación: primera vez en 3rd Period con diferencia ≤1 ---
+          const currentPeriod = game.period?.current || "";
+          const diff = Math.abs(goalsHome - goalsAway);
+
+          if (
+            String(currentPeriod).toLowerCase().includes("3rd") &&
+            diff <= 1 &&
+            !notifiedHockeyGames.has(key)
+          ) {
+            sendHockeyNotification(`🏒 NHL en vivo - Último periodo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
-Marcador: ${goalsHome} - ${goalsAway}`);
-            notifiedHockeyGames.set(key, true);
+Marcador: ${goalsHome} - ${goalsAway}
+⚡ Diferencia ajustada: ${diff} goles`);
+            notifiedHockeyGames.set(key, true); // lo marcamos como ya notificado
           }
 
           // --- Guardar en historial si terminó ---
-          const statusNorm = status.toLowerCase();
           if (
             statusNorm.includes("finished") ||
             statusNorm.includes("ended") ||
