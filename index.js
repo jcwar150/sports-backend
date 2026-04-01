@@ -456,6 +456,7 @@ Marcador: ${goalsHome} - ${goalsAway}
   );
   req.end();
 
+}
 
 
 // --- Obtener hora local en Ecuador ---
