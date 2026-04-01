@@ -405,15 +405,23 @@ function getLiveHockeyEvents() {
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
 
+          // --- Filtra solo NHL ---
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
           const statusNorm = status.toLowerCase();
 
-          // --- Notificación: 3rd Period con diferencia ≤1 ---
+          // --- Depuración: imprime siempre periodo y diferencia ---
           const currentPeriod = game.period?.current || "";
           const diff = Math.abs(goalsHome - goalsAway);
+          console.log("DEBUG Hockey:", {
+            partido: key,
+            currentPeriod,
+            diff,
+            status
+          });
 
+          // --- Notificación: primera vez en 3rd Period con diferencia ≤1 ---
           const isThirdPeriod =
             String(currentPeriod).toLowerCase().includes("3rd") ||
             String(currentPeriod) === "3";
@@ -447,7 +455,6 @@ Marcador: ${goalsHome} - ${goalsAway}
     console.error("❌ Error en la petición hockey:", err.message)
   );
   req.end();
-}
 
 
 
