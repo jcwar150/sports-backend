@@ -409,30 +409,22 @@ function getLiveHockeyEvents() {
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
-          const statusNorm = status.toLowerCase();
 
-          // --- Depuración: imprime periodo y diferencia ---
-          const currentPeriod = game.period?.current || "";
-          const diff = Math.abs(goalsHome - goalsAway);
-          console.log("DEBUG Hockey:", { partido: key, currentPeriod, diff, status });
+          // --- Depuración: imprime siempre partido y estado ---
+          console.log("DEBUG Hockey:", { partido: key, league, status, goalsHome, goalsAway });
 
-          // --- Notificación: 3rd Period con diferencia ≤1 ---
-          const isThirdPeriod =
-            String(currentPeriod).toLowerCase().includes("3rd") ||
-            String(currentPeriod).toLowerCase().includes("period 3") ||
-            String(currentPeriod) === "3";
-
-          if (isThirdPeriod && diff <= 1 && !notifiedHockeyGames.has(key)) {
-            sendHockeyNotification(`🏒 NHL en vivo - Último periodo
+          // --- Notificación de prueba: cualquier partido en vivo ---
+          if (!notifiedHockeyGames.has(key)) {
+            sendHockeyNotification(`🏒 NHL en vivo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
-Marcador: ${goalsHome} - ${goalsAway}
-⚡ Diferencia ajustada: ${diff} goles`);
+Marcador: ${goalsHome} - ${goalsAway}`);
             notifiedHockeyGames.set(key, true);
           }
 
           // --- Guardar en historial si terminó ---
+          const statusNorm = status.toLowerCase();
           if (
             statusNorm.includes("finished") ||
             statusNorm.includes("ended") ||
@@ -450,6 +442,7 @@ Marcador: ${goalsHome} - ${goalsAway}
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
+
 
 
 // --- Obtener hora local en Ecuador ---
