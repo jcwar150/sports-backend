@@ -379,6 +379,15 @@ Liga: ${league} | País: ${country}
 function getLiveHockeyEvents() {
   resetDailyGamesIfNeeded();
 
+  // --- Notificación de prueba manual ---
+  sendHockeyNotification(`🏒 Notificación de prueba NHL
+Partido: Equipo A vs Equipo B
+Liga: NHL
+Estado: En progreso
+Marcador: 2 - 1`);
+  console.log("✅ Notificación de prueba enviada a OneSignal (Hockey)");
+
+  // --- Luego sigue la lógica normal del API ---
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -405,15 +414,11 @@ function getLiveHockeyEvents() {
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
 
-          // --- Filtra solo NHL ---
           if (!league.toLowerCase().includes("nhl")) return;
 
           const key = `${home} vs ${away}`;
-
-          // --- Depuración: imprime siempre partido y estado ---
           console.log("DEBUG Hockey:", { partido: key, league, status, goalsHome, goalsAway });
 
-          // --- Notificación de prueba: cualquier partido en vivo ---
           if (!notifiedHockeyGames.has(key)) {
             sendHockeyNotification(`🏒 NHL en vivo
 ${home} vs ${away}
@@ -423,7 +428,6 @@ Marcador: ${goalsHome} - ${goalsAway}`);
             notifiedHockeyGames.set(key, true);
           }
 
-          // --- Guardar en historial si terminó ---
           const statusNorm = status.toLowerCase();
           if (
             statusNorm.includes("finished") ||
