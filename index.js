@@ -395,6 +395,10 @@ function getLiveHockeyEvents() {
     res.on("end", () => {
       try {
         const json = JSON.parse(data);
+
+        // --- Imprime todo el JSON para depuración ---
+        console.log("RAW Hockey JSON:", JSON.stringify(json, null, 2));
+
         const games = json.data || json.events || [];
 
         games.forEach(game => {
@@ -439,7 +443,6 @@ Marcador: ${goalsHome} - ${goalsAway}`);
   req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
   req.end();
 }
-
 
 
 // --- Obtener hora local en Ecuador ---
