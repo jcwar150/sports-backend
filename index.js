@@ -379,15 +379,6 @@ Liga: ${league} | País: ${country}
 function getLiveHockeyEvents() {
   resetDailyGamesIfNeeded();
 
-  // --- Notificación de prueba manual ---
-  sendHockeyNotification(`🏒 Notificación de prueba NHL
-Partido: Equipo A vs Equipo B
-Liga: NHL
-Estado: En progreso
-Marcador: 2 - 1`);
-  console.log("✅ Notificación de prueba enviada a OneSignal (Hockey)");
-
-  // --- Luego sigue la lógica normal del API ---
   const options = {
     method: "GET",
     hostname: "sportapi7.p.rapidapi.com",
@@ -407,20 +398,21 @@ Marcador: 2 - 1`);
         const games = json.data || json.events || [];
 
         games.forEach(game => {
-          const home = game.homeTeam?.name;
-          const away = game.awayTeam?.name;
-          const league = game.tournament?.name || "";
-          const status = game.status?.description || "";
+          const home = game.homeTeam?.name || "Equipo local";
+          const away = game.awayTeam?.name || "Equipo visitante";
+          const league = game.tournament?.name || "Liga desconocida";
+          const status = game.status?.description || "Estado desconocido";
           const goalsHome = game.homeScore?.current ?? 0;
           const goalsAway = game.awayScore?.current ?? 0;
 
-          if (!league.toLowerCase().includes("nhl")) return;
-
           const key = `${home} vs ${away}`;
+
+          // --- Depuración: imprime siempre partido y estado ---
           console.log("DEBUG Hockey:", { partido: key, league, status, goalsHome, goalsAway });
 
+          // --- Notificación: cualquier partido en vivo ---
           if (!notifiedHockeyGames.has(key)) {
-            sendHockeyNotification(`🏒 NHL en vivo
+            sendHockeyNotification(`🏒 Hockey en vivo
 ${home} vs ${away}
 Liga: ${league}
 Estado: ${status}
@@ -428,6 +420,7 @@ Marcador: ${goalsHome} - ${goalsAway}`);
             notifiedHockeyGames.set(key, true);
           }
 
+          // --- Guardar en historial si terminó ---
           const statusNorm = status.toLowerCase();
           if (
             statusNorm.includes("finished") ||
