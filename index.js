@@ -281,7 +281,7 @@ function getLiveBasketEvents() {
               const q1 = (game.homeScore?.period1 ?? 0) + (game.awayScore?.period1 ?? 0);
               const q2 = (game.homeScore?.period2 ?? 0) + (game.awayScore?.period2 ?? 0);
               const q3 = (game.homeScore?.period3 ?? 0) + (game.awayScore?.period3 ?? 0);
-              const avgPrevQuarters = ((q1 + q2 + q3) / 3) - 10;
+              const avgPrevQuarters = ((q1 + q2 + q3) / 3) -5;
               const suggestion = totalPoints + avgPrevQuarters;
 
               sendBasketNotification(`⚡ Último cuarto desbalanceado
@@ -375,6 +375,82 @@ Liga: ${league} | País: ${country}
   req.on("error", err => console.error("❌ Error en la petición basket:", err.message));
   req.end();
 }
+
+function getLiveHockeyEvents() {
+  resetDailyGamesIfNeeded();
+
+  const options = {
+    method: "GET",
+    hostname: "sportapi7.p.rapidapi.com",
+    path: `/api/v1/sport/ice-hockey/events/live`,
+    headers: {
+      "x-rapidapi-key": API_SPORT_KEY,
+      "x-rapidapi-host": "sportapi7.p.rapidapi.com"
+    }
+  };
+
+  const req = https.request(options, res => {
+    let data = "";
+    res.on("data", chunk => (data += chunk));
+    res.on("end", () => {
+      try {
+        const json = JSON.parse(data);
+        const games = json.data || json.events || [];
+
+        games.forEach(game => {
+          const home = game.homeTeam?.name;
+          const away = game.awayTeam?.name;
+          const league = game.tournament?.name || "";
+          const status = game.status?.description || "";
+          const goalsHome = game.homeScore?.current ?? 0;
+          const goalsAway = game.awayScore?.current ?? 0;
+
+          // --- Filtra solo NHL ---
+          if (!league.toLowerCase().includes("nhl")) return;
+
+          const key = `${home} vs ${away}`;
+          const statusNorm = status.toLowerCase();
+
+          // --- Depuración: imprime periodo y diferencia ---
+          const currentPeriod = game.period?.current || "";
+          const diff = Math.abs(goalsHome - goalsAway);
+          console.log("DEBUG Hockey:", { partido: key, currentPeriod, diff, status });
+
+          // --- Notificación: 3rd Period con diferencia ≤1 ---
+          const isThirdPeriod =
+            String(currentPeriod).toLowerCase().includes("3rd") ||
+            String(currentPeriod).toLowerCase().includes("period 3") ||
+            String(currentPeriod) === "3";
+
+          if (isThirdPeriod && diff <= 1 && !notifiedHockeyGames.has(key)) {
+            sendHockeyNotification(`🏒 NHL en vivo - Último periodo
+${home} vs ${away}
+Liga: ${league}
+Estado: ${status}
+Marcador: ${goalsHome} - ${goalsAway}
+⚡ Diferencia ajustada: ${diff} goles`);
+            notifiedHockeyGames.set(key, true);
+          }
+
+          // --- Guardar en historial si terminó ---
+          if (
+            statusNorm.includes("finished") ||
+            statusNorm.includes("ended") ||
+            statusNorm.includes("final")
+          ) {
+            saveToHistory(game, "hockey");
+          }
+        });
+      } catch (err) {
+        console.error("❌ Error parseando respuesta hockey:", err.message);
+      }
+    });
+  });
+
+  req.on("error", err => console.error("❌ Error en la petición hockey:", err.message));
+  req.end();
+}
+
 
 // --- Obtener hora local en Ecuador ---
 function getLocalTime() {
